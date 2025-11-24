@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2" # dependencie resolution
+members = [ # list of all crates on the workspace so cargo manage all together
+	"backend",
+	"frontend",
+	"shared",
+]
+
+[workspace.package]
+# Shared metadata for all crates
+version = "0.1.0"
+edition = "2021" # Rust 2021 edition
+authors = ["Mickael Yoshua"]
+
+[workspace.dependencies]
+# Shared dependencies for all crates
+serde = { version = "1.0", features = ["derive"] } # serialization/deserialization
+serde_json = "1.0" # serde for JSON handling
+chrono = { version = "0.4", features = ["serde"] } # date/time handling
+uuid = { version = "1.10", features = ["v4", "serde"] } # generate unique IDs
+
+# Internal crates (for cross-referencing)
+shared = { path = "shared" } # allows backend and frontend access to shared crates

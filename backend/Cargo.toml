@@ -1,0 +1,49 @@
+[package]
+name = "backend"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# Web framework
+rocket = { version = "0.5", features = ["json"] }
+rocket_cors = "0.6"
+
+# Database
+diesel = { version = "2.2", features = ["postgres", "r2d2", "chrono", "uuid"] }
+diesel_migrations = "2.2"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Serialization (from workspace)
+# User the version difined in the root workspace
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+
+# Authentication
+jsonwebtoken = "10.2"
+argon2 = "0.5"
+password-hash = "0.5.0"
+rand = "0.9"
+
+# Validation
+validator = { version = "0.20", features = ["derive"] }
+
+# Redis
+redis = { version = "0.32", features = ["tokio-comp", "connection-manager"] }
+
+# Environment variables
+dotenv = "0.15"
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+# API documentation
+utoipa = { version = "5.4", features = ["rocket_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "9", features = ["rocket"] }
+
+# Shared code
+shared = { workspace = true }
