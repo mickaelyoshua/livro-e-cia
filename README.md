@@ -102,22 +102,79 @@ livro-e-cia/
 ## Development Setup
 
 ### Prerequisites
-- Rust 1.75+
-- PostgreSQL 15+
-- Redis 7+
-- `cargo install trunk`
-- `cargo install diesel_cli --no-default-features --features postgres`
 
-### Environment Variables
-Create `backend/.env`:
-```env
-DATABASE_URL=postgres://user:pass@localhost/livro_e_cia
-REDIS_URL=redis://localhost:6379
-JWT_SECRET=your-256-bit-secret
-ROCKET_PORT=8000
+**Required:**
+- Rust 1.75+
+- Docker & Docker Compose (for databases)
+
+**Install Tools:**
+```bash
+# Trunk - Leptos frontend build tool
+cargo install trunk
+
+# Diesel CLI - Database migration tool (PostgreSQL only)
+cargo install diesel_cli --no-default-features --features postgres
 ```
 
-### Running
+**If Diesel CLI fails to compile**, install PostgreSQL development libraries:
+```bash
+# Arch Linux
+sudo pacman -S postgresql-libs
+
+# Ubuntu/Debian
+sudo apt-get install libpq-dev
+
+# macOS
+brew install postgresql
+```
+
+**Verify installation:**
+```bash
+diesel --version  # Should show diesel 2.2.x
+trunk --version
+```
+
+### Quick Start with Make
+
+```bash
+# Copy environment example and add your passwords
+cp .env.example .env
+# Edit .env with real passwords (use: make gen-password and make gen-jwt)
+
+# Start databases
+make docker-up
+
+# Set up Diesel (first time only)
+make db-setup
+
+# See all available commands
+make help
+```
+
+### Common Make Commands
+
+```bash
+# Docker operations
+make docker-up        # Start PostgreSQL and Redis
+make docker-down      # Stop containers (keep data)
+make docker-logs      # View logs
+make docker-ps        # Check status
+
+# Database operations
+make db-setup         # Initialize Diesel
+make db-migrate       # Run migrations
+make db-psql          # Open PostgreSQL shell
+
+# Generate secure values
+make gen-password     # For .env passwords
+make gen-jwt          # For JWT secret
+
+# Development
+make backend-run      # Start backend API
+make frontend-run     # Start frontend dev server
+```
+
+### Manual Commands (without Make)
 
 **Backend:**
 ```bash
