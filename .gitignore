@@ -5,10 +5,11 @@ target
 *.pdb
 **/mutants.out*/
 
-# Environment variables
+# Environment variables (all directories)
 .env
-.env.local
-.env.production
+**/.env
+.env.*
+**/.env.*
 
 # IDE
 .vscode/
@@ -20,3 +21,7 @@ pkg/
 
 # Claude Code context
 CLAUDE.md
+
+# Diesel ORM
+**/.diesel_lock
+**/.keep
