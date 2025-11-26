@@ -13,8 +13,7 @@ INSERT INTO roles (name, description)
 VALUES
 	('admin', 'Full system access'),
 	('manager', 'Store manager - reports and inventory'),
-	('employee', 'Store employee - sales and basic inventory'),
-	('customer', 'Customer account (future e-commerce)');
+	('employee', 'Store employee - sales and basic inventory');
 
 -- Auto-update trigger
 CREATE OR REPLACE FUNCTION update_updated_at_column()
