@@ -2,7 +2,7 @@
 
 > Internal management system for "Livro & Cia" bookstore at PAZ Church João Pessoa
 
-Full-stack web application built in Rust for managing bookstore operations: inventory control, sales tracking, and employee management. Designed for future e-commerce expansion.
+Full-stack web application built in Rust for managing bookstore operations: inventory control, sales tracking, and employee management. Designed exclusively for internal use by church staff.
 
 ## Tech Stack
 
@@ -32,19 +32,14 @@ Frontend (Leptos WASM) ←→ Backend (Rocket API) ←→ PostgreSQL/Redis
 
 ## Features
 
-### Phase 1: Internal Management (Current)
+### Internal Management System
 - Stock management (CRUD operations)
 - Sales tracking and recording
 - Employee management with role-based access
 - Reports and analytics
 - Audit logging
-
-### Phase 2: Public E-Commerce (Future)
-- Product catalog with SEO
-- Shopping cart and checkout
-- Payment processing
-- Customer accounts
-- Order management
+- Admin-managed user accounts
+- Email verification and password reset
 
 ## Project Structure
 
@@ -70,10 +65,13 @@ livro-e-cia/
 ## API Endpoints
 
 ### Authentication
-- `POST /api/v1/auth/register` - Register user (admin)
 - `POST /api/v1/auth/login` - Login (returns JWT)
 - `POST /api/v1/auth/refresh` - Refresh token
+- `POST /api/v1/auth/verify-email` - Verify employee email
+- `POST /api/v1/auth/forgot-password` - Request password reset
 - `GET /api/v1/auth/me` - Current user
+
+*Note: Employee accounts are created by admins via `/api/v1/employees`*
 
 ### Products
 - `GET /api/v1/products` - List (paginated)
@@ -205,7 +203,7 @@ App: `http://localhost:8080`
 
 ## Roadmap
 
-**Phase 1:** Internal management system
+**Phase 1:** Core Internal Management
 - [ ] Project setup and database schema
 - [ ] Authentication (Argon2 + JWT)
 - [ ] Product/inventory CRUD
@@ -213,18 +211,13 @@ App: `http://localhost:8080`
 - [ ] Employee management
 - [ ] Reporting
 
-**Phase 2:** Enhanced features
+**Phase 2:** Enhanced Features
 - [ ] Advanced search/filtering
 - [ ] Data export (CSV, PDF)
 - [ ] Email notifications
-- [ ] File uploads (book covers)
-
-**Phase 3:** Public e-commerce
-- [ ] Product catalog (SEO)
-- [ ] Shopping cart
-- [ ] Payment integration
-- [ ] Customer accounts
-- [ ] Order management
+- [ ] File uploads (book covers, receipts)
+- [ ] Low stock alerts
+- [ ] Advanced analytics
 
 ## License
 
