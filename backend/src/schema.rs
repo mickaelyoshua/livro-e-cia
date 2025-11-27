@@ -2,7 +2,6 @@
 
 diesel::table! {
     use diesel::sql_types::*;
-    use crate::schema::sql_types::*;
 
     roles (id) {
         id -> Uuid,
@@ -16,7 +15,6 @@ diesel::table! {
 
 diesel::table! {
     use diesel::sql_types::*;
-    use crate::schema::sql_types::*;
 
     users (id) {
         id -> Uuid,
