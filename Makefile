@@ -116,7 +116,7 @@ db-migration:
 db-psql:
 	@echo "🐘 Connecting to PostgreSQL..."
 	@echo "Tip: Use \\dt to list tables, \\q to quit"
-	docker compose exec livro_cia_postgres psql -U livro_cia_user -d livro_cia_db
+	docker compose exec postgres psql -U livro_cia_user -d livro_cia_db
 
 redis-cli:
 	@echo "📮 Connecting to Redis..."
