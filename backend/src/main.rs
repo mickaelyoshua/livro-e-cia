@@ -1,10 +1,9 @@
 use std::env;
 
 use dotenv::dotenv;
-use rocket::{get, launch};
+use rocket::launch;
 
-use crate::db::pool::DbConnection;
-
+mod auth;
 mod db;
 mod models;
 mod schema;
@@ -20,6 +19,7 @@ fn rocket() -> _ {
                    // continue since it will return None
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env file");
+    let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
     let pool =
         db::pool::init_pool(&database_url).expect("Failed to create database connection pool");
@@ -28,5 +28,8 @@ fn rocket() -> _ {
     env_logger::init();
 
     // stores pool in rocket state
-    rocket::build().manage(pool).mount("/", rocket::routes![])
+    rocket::build()
+        .manage(jwt_secret)
+        .manage(pool)
+        .mount("/", rocket::routes![])
 }
