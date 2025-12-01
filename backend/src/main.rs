@@ -5,7 +5,9 @@ use rocket::launch;
 
 mod auth;
 mod db;
+mod error;
 mod models;
+mod routes;
 mod schema;
 
 // Macro for Rocket application entry point
@@ -21,15 +23,14 @@ fn rocket() -> _ {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env file");
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
-    let pool =
-        db::pool::init_pool(&database_url).expect("Failed to create database connection pool");
+    let pool = db::init_pool(&database_url).expect("Failed to create database connection pool");
 
-    // Enables logging, so we can use log::tace!, log::debug!, log::error! ...
+    // Enables logging, so we can use log::trace!, log::debug!, log::error! ...
     env_logger::init();
 
     // stores pool in rocket state
-    rocket::build()
-        .manage(jwt_secret)
-        .manage(pool)
-        .mount("/", rocket::routes![])
+    rocket::build().manage(jwt_secret).manage(pool).mount(
+        "/",
+        rocket::routes![routes::login, routes::get_current_user],
+    )
 }
