@@ -37,6 +37,19 @@ pub struct UserSummaryDto {
     pub role_name: String,
 }
 
+// ========== Refresh Token DTOs ==========
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RefreshRequest {
+    pub refresh_token: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TokenResponse {
+    pub access_token: String,
+    pub refresh_token: String,
+}
+
 // ========== Auth Request DTOs ==========
 
 #[derive(Debug, Deserialize)]
@@ -55,8 +68,7 @@ pub struct RegisterRequest {
 
 #[derive(Debug, Serialize)]
 pub struct AuthResponse {
-    pub access_token: String,
-    pub refresh_token: String,
+    pub token_response: TokenResponse,
     pub user: UserDto,
 }
 
