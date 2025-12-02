@@ -31,6 +31,10 @@ fn rocket() -> _ {
     // stores pool in rocket state
     rocket::build().manage(jwt_secret).manage(pool).mount(
         "/",
-        rocket::routes![routes::login, routes::get_current_user],
+        rocket::routes![
+            routes::login,
+            routes::get_current_user,
+            routes::refresh_token
+        ],
     )
 }

@@ -1,14 +1,17 @@
+use chrono::{Duration, Utc};
 use diesel::{prelude::*, PgTextExpressionMethods, QueryDsl, SelectableHelper};
 use rocket::{get, post, serde::json::Json, State};
-use shared::{AuthResponse, LoginRequest, UserDto};
+use shared::{AuthResponse, LoginRequest, RefreshRequest, TokenResponse, UserDto};
 
 use crate::{
-    auth::{guards::AuthUser, jwt, password},
+    auth::{guards::AuthUser, jwt, password, refresh},
     db::pool::DbConnection,
     error::ApiError,
     models::{roles::Role, user::User},
     schema::{roles, users},
 };
+
+const REFRESH_TOKEN_EXPIRY: i64 = 7; // 7 days
 
 #[post("/api/v1/auth/login", format = "json", data = "<credentials>")]
 pub async fn login(
@@ -47,6 +50,10 @@ pub async fn login(
     let access_token = jwt::generate_access_token(user.id, &role.name, jwt_secret)?;
     let refresh_token = jwt::generate_refresh_token(user.id, &role.name, jwt_secret)?;
 
+    // Store refresh token in database
+    let refresh_expires = Utc::now() + Duration::days(REFRESH_TOKEN_EXPIRY);
+    refresh::store_refresh_token(user.id, &refresh_token, refresh_expires, &mut db.0)?;
+
     // Update last_login_at timestamp (ignore errors - non-critical)
     use chrono::Utc;
     diesel::update(users::table.find(user.id))
@@ -57,8 +64,10 @@ pub async fn login(
     log::info!("Successful login: {}", email);
 
     Ok(Json(AuthResponse {
-        access_token,
-        refresh_token,
+        token_response: TokenResponse {
+            access_token,
+            refresh_token,
+        },
         user: user.into_dto(role), // exclude password_hash
     }))
 }
@@ -84,4 +93,37 @@ pub async fn get_current_user(
         })?;
 
     Ok(Json(user.into_dto(role)))
+}
+
+#[post("/api/v1/auth/refresh", format = "json", data = "<request>")]
+pub async fn refresh_token(
+    request: Json<RefreshRequest>,
+    mut db: DbConnection,
+    jwt_secret: &State<String>,
+) -> Result<Json<TokenResponse>, ApiError> {
+    let (user, old_token) =
+        refresh::validate_refresh_token(&request.refresh_token, jwt_secret, &mut db.0)?;
+
+    let role = roles::table
+        .find(user.role_id)
+        .first::<Role>(&mut db.0)
+        .map_err(|e| {
+            log::error!("Role not found for user {}: {:?}", user.id, e);
+            ApiError::InternalError("Failed to get user role".to_string())
+        })?;
+
+    let new_access_token = jwt::generate_access_token(user.id, &role.name, jwt_secret)?;
+    let new_refresh_token = jwt::generate_refresh_token(user.id, &role.name, jwt_secret)?;
+
+    let refresh_expires = Utc::now() + Duration::days(REFRESH_TOKEN_EXPIRY);
+    refresh::store_refresh_token(user.id, &new_refresh_token, refresh_expires, &mut db.0)?;
+
+    refresh::revoke_refresh_token(old_token.id, "used", &mut db.0)?;
+
+    log::info!("Token refresh successful for user: {}", user.id);
+
+    Ok(Json(TokenResponse {
+        access_token: new_access_token,
+        refresh_token: new_refresh_token,
+    }))
 }
