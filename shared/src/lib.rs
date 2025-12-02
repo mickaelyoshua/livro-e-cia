@@ -72,6 +72,13 @@ pub struct AuthResponse {
     pub user: UserDto,
 }
 
+// ========== Logout DTOs ==========
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LogoutRequest {
+    pub refresh_token: String,
+}
+
 // ========== Password Reset DTOs ==========
 
 #[derive(Debug, Deserialize)]

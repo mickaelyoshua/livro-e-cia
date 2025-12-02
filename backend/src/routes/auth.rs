@@ -1,7 +1,8 @@
 use chrono::{Duration, Utc};
 use diesel::{prelude::*, PgTextExpressionMethods, QueryDsl, SelectableHelper};
 use rocket::{get, post, serde::json::Json, State};
-use shared::{AuthResponse, LoginRequest, RefreshRequest, TokenResponse, UserDto};
+use serde_json::Value;
+use shared::{AuthResponse, LoginRequest, LogoutRequest, RefreshRequest, TokenResponse, UserDto};
 
 use crate::{
     auth::{guards::AuthUser, jwt, password, refresh},
@@ -70,6 +71,24 @@ pub async fn login(
         },
         user: user.into_dto(role), // exclude password_hash
     }))
+}
+
+#[post("/api/v1/auth/logout", format = "json", data = "<request>")]
+pub async fn logout(
+    request: Json<LogoutRequest>,
+    mut db: DbConnection,
+    jwt_secret: &State<String>,
+) -> Result<Json<Value>, ApiError> {
+    let (_user, db_token) =
+        refresh::validate_refresh_token(&request.refresh_token, jwt_secret, &mut db.0)?;
+
+    refresh::revoke_refresh_token(db_token.id, "user_logout", &mut db.0)?;
+
+    log::info!("User logged out successfully");
+
+    Ok(Json(
+        serde_json::json!({"message": "Logged out successfully"}),
+    ))
 }
 
 #[get("/api/v1/auth/me")]

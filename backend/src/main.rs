@@ -34,7 +34,8 @@ fn rocket() -> _ {
         rocket::routes![
             routes::login,
             routes::get_current_user,
-            routes::refresh_token
+            routes::refresh_token,
+            routes::logout,
         ],
     )
 }
