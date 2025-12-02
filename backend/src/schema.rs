@@ -3,6 +3,21 @@
 diesel::table! {
     use diesel::sql_types::*;
 
+    refresh_tokens (id) {
+        id -> Uuid,
+        user_id -> Uuid,
+        #[max_length = 255]
+        token_hash -> Varchar,
+        expires_at -> Timestamptz,
+        created_at -> Timestamptz,
+        revoked_at -> Nullable<Timestamptz>,
+        last_used_at -> Nullable<Timestamptz>,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+
     roles (id) {
         id -> Uuid,
         #[max_length = 50]
@@ -37,6 +52,7 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(refresh_tokens -> users (user_id));
 diesel::joinable!(users -> roles (role_id));
 
-diesel::allow_tables_to_appear_in_same_query!(roles, users,);
+diesel::allow_tables_to_appear_in_same_query!(refresh_tokens, roles, users,);
