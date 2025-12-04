@@ -1,6 +1,7 @@
 // Data Transfer Objects
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -35,6 +36,69 @@ pub struct UserSummaryDto {
     pub name: String,
     pub email: String,
     pub role_name: String,
+}
+
+// ========== Category DTOs ==========
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CategoryDto {
+    pub id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+}
+
+// ========== Product DTOs ==========
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProductDto {
+    pub id: Uuid,
+    pub title: String,
+    pub author: String,
+    pub price: Decimal,
+    pub stock_quantity: i32,
+    pub publisher: Option<String>,
+    pub publication_date: Option<NaiveDate>,
+    pub category: CategoryDto,
+    pub description: Option<String>,
+    pub cover_image_url: Option<String>,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateProductRequest {
+    pub title: String,
+    pub author: String,
+    pub price: Decimal,
+    pub stock_quantity: i32,
+    pub publisher: Option<String>,
+    pub publication_date: Option<NaiveDate>,
+    pub category_id: Uuid,
+    pub description: Option<String>,
+    pub cover_image_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateProductRequest {
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub price: Option<Decimal>,
+    pub stock_quantity: Option<i32>,
+    pub publisher: Option<String>,
+    pub publication_date: Option<NaiveDate>,
+    pub category_id: Option<Uuid>,
+    pub description: Option<String>,
+    pub cover_image_url: Option<String>,
+    pub is_active: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PaginatedResponse<T> {
+    pub data: Vec<T>,
+    pub page: i64,
+    pub per_page: i64,
+    pub total_count: i64,
+    pub total_pages: i64,
 }
 
 // ========== Refresh Token DTOs ==========
