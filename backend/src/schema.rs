@@ -3,6 +3,43 @@
 diesel::table! {
     use diesel::sql_types::*;
 
+    categories (id) {
+        id -> Uuid,
+        #[max_length = 100]
+        name -> Varchar,
+        description -> Nullable<Text>,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+
+    products (id) {
+        id -> Uuid,
+        #[max_length = 255]
+        title -> Varchar,
+        #[max_length = 255]
+        author -> Varchar,
+        price -> Numeric,
+        stock_quantity -> Int4,
+        #[max_length = 255]
+        publisher -> Nullable<Varchar>,
+        publication_date -> Nullable<Date>,
+        category_id -> Uuid,
+        description -> Nullable<Text>,
+        #[max_length = 500]
+        cover_image_url -> Nullable<Varchar>,
+        is_active -> Bool,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+
     refresh_tokens (id) {
         id -> Uuid,
         user_id -> Uuid,
@@ -52,7 +89,8 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(products -> categories (category_id));
 diesel::joinable!(refresh_tokens -> users (user_id));
 diesel::joinable!(users -> roles (role_id));
 
-diesel::allow_tables_to_appear_in_same_query!(refresh_tokens, roles, users,);
+diesel::allow_tables_to_appear_in_same_query!(categories, products, refresh_tokens, roles, users,);
