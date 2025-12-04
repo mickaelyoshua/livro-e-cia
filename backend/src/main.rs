@@ -36,6 +36,11 @@ fn rocket() -> _ {
             routes::get_current_user,
             routes::refresh_token,
             routes::logout,
+            routes::list_products,
+            routes::get_product,
+            routes::create_product,
+            routes::update_product,
+            routes::delete_product,
         ],
     )
 }
