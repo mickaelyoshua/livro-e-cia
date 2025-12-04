@@ -99,3 +99,30 @@ impl<'r> FromRequest<'r> for OptionalAuthUser {
         }
     }
 }
+
+pub struct AdminGuard(pub AuthUser);
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for AdminGuard {
+    type Error = ApiError;
+    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        let auth_user = match req.guard::<AuthUser>().await {
+            Outcome::Success(user) => user,
+            Outcome::Error((status, err)) => return Outcome::Error((status, err)),
+            Outcome::Forward(status) => return Outcome::Forward(status),
+        };
+
+        if auth_user.role.to_lowercase() == "admin" {
+            Outcome::Success(AdminGuard(auth_user))
+        } else {
+            log::warn!(
+                "Non-admin user {} attempted admin action",
+                auth_user.user_id
+            );
+            Outcome::Error((
+                Status::Forbidden,
+                ApiError::Forbidden("Admin access required".to_string()),
+            ))
+        }
+    }
+}
