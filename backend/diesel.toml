@@ -1,6 +1,6 @@
 [print_schema]
 file = "src/schema.rs"
-import_types = ["diesel::sql_types::*", "crate::schema::sql_types::*"]
+import_types = ["diesel::sql_types::*"]
 
 [migrations_directory]
 dir = "migrations"
