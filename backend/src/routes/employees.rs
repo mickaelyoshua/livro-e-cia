@@ -1,5 +1,3 @@
-// ========== Query Parameters ==========
-
 use diesel::prelude::*;
 use rocket::{delete, get, http::Status, post, put, serde::json::Json, FromForm};
 use serde_json::Value;
@@ -12,8 +10,10 @@ use crate::{
     error::ApiError,
     models::{NewUser, Role, UpdateUser, User},
     schema::{roles, users},
-    utils::validate_dto,
+    utils::{parse_uuid, validate_dto, Pagination},
 };
+
+// ========== Query Parameters ==========
 
 #[derive(Debug, FromForm)]
 pub struct EmployeeQuery {
@@ -30,23 +30,18 @@ pub async fn list_employees(
     query: EmployeeQuery,
     admin: AdminGuard,
 ) -> Result<Json<PaginatedResponse<UserDto>>, ApiError> {
-    let page = query.page.unwrap_or(1).max(1);
-    let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
-    let offset = (page - 1) * per_page;
+    let pagination = Pagination::new(query.page, query.per_page);
 
     log::info!(
         "Admin {} listing employees: page={}, per_page={}",
         admin.0.user_id,
-        page,
-        per_page
+        pagination.page,
+        pagination.per_page
     );
 
     // Validate role_id UUID if provided
     let role_filter = if let Some(role_id_str) = query.role_id {
-        Some(Uuid::parse_str(&role_id_str).map_err(|e| {
-            log::warn!("Invalid role_id UUID: {}", e);
-            ApiError::ValidationError("Invalid role_id format".to_string())
-        })?)
+        Some(parse_uuid(&role_id_str, "role")?)
     } else {
         None
     };
@@ -85,8 +80,8 @@ pub async fn list_employees(
 
     let results = build_filtered_quey()
         .select((User::as_select(), Role::as_select()))
-        .limit(per_page)
-        .offset(offset)
+        .limit(pagination.per_page)
+        .offset(pagination.offset)
         .load::<(User, Role)>(&mut db.0)
         .map_err(|e| {
             log::error!("Failed to load employees: {}", e);
@@ -98,19 +93,19 @@ pub async fn list_employees(
         .map(|(user, role)| user.into_dto(role))
         .collect();
 
-    let total_pages = (total_count as f64 / per_page as f64).ceil() as i64;
+    let total_pages = pagination.total_pages(total_count);
 
     log::info!(
         "Retrieved {} employees (page {}/{})",
         emplyee_dtos.len(),
-        page,
+        pagination.page,
         total_pages
     );
 
     Ok(Json(PaginatedResponse {
         data: emplyee_dtos,
-        page,
-        per_page,
+        page: pagination.page,
+        per_page: pagination.per_page,
         total_count,
         total_pages,
     }))
@@ -124,10 +119,7 @@ pub async fn get_employee(
     id: String,
     admin: AdminGuard,
 ) -> Result<Json<UserDto>, ApiError> {
-    let employee_id = Uuid::parse_str(&id).map_err(|e| {
-        log::warn!("Invalid employee UUID: {}", e);
-        ApiError::ValidationError("Invalid employee ID format".to_string())
-    })?;
+    let employee_id = parse_uuid(&id, "employee")?;
 
     log::info!(
         "Admin {} fetching employee: {}",
@@ -228,9 +220,9 @@ pub async fn create_employee(
 
     // Insert employee
     let new_user = NewUser {
-        email: req.email.clone(),
+        email: req.email,
         password_hash,
-        name: req.name.clone(),
+        name: req.name,
         role_id: req.role_id,
     };
 
@@ -277,7 +269,7 @@ pub async fn create_employee(
         })?;
 
     log::info!("Employee {} created: {}", user.id, user.email);
-    log::info!("Verification token: {}", verification_token);
+    // TODO: Send verification email
     // TODO: Send email with verification_token
 
     Ok((Status::Created, Json(user.into_dto(role))))
@@ -292,10 +284,7 @@ pub async fn update_employee(
     id: String,
     request: Json<UpdateEmployeeRequest>,
 ) -> Result<Json<UserDto>, ApiError> {
-    let employee_id = Uuid::parse_str(&id).map_err(|e| {
-        log::warn!("Invalid employee UUID: {}", e);
-        ApiError::ValidationError("Invalid employee ID format".to_string())
-    })?;
+    let employee_id = parse_uuid(&id, "employee")?;
 
     // Validation
     validate_dto(&*request)?;
@@ -397,10 +386,7 @@ pub async fn delete_employee(
     admin: AdminGuard,
     id: String,
 ) -> Result<Json<Value>, ApiError> {
-    let employee_id = Uuid::parse_str(&id).map_err(|e| {
-        log::warn!("Invalid employee UUID: {}", e);
-        ApiError::ValidationError("Invalid employee ID format".to_string())
-    })?;
+    let employee_id = parse_uuid(&id, "employee")?;
 
     log::info!(
         "Admin {} deleting employee: {}",
@@ -436,14 +422,20 @@ pub async fn delete_employee(
 
     // Revoke all refresh tokens
     use crate::schema::refresh_tokens;
-    diesel::update(
+    if let Err(e) = diesel::update(
         refresh_tokens::table
             .filter(refresh_tokens::user_id.eq(employee_id))
             .filter(refresh_tokens::revoked_at.is_null()),
     )
     .set(refresh_tokens::revoked_at.eq(Some(chrono::Utc::now())))
     .execute(&mut db.0)
-    .ok(); // Non-critical - don't fail deletion if token revocation fails
+    {
+        log::warn!(
+            "Failed to revoke tokens for employee {}: {}",
+            employee_id,
+            e
+        );
+    }
 
     log::info!("Employee {} deactivated", employee_id);
 
