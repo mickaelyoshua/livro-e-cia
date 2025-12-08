@@ -10,6 +10,7 @@ use crate::{
     error::ApiError,
     models::{Category, NewProduct, Product, UpdateProduct},
     schema::{categories, products},
+    utils::validate_dto,
 };
 
 // ========== Query Parameters ==========
@@ -203,24 +204,10 @@ pub async fn create_product(
     admin: AdminGuard,
     request: Json<CreateProductRequest>,
 ) -> Result<(Status, Json<ProductDto>), ApiError> {
-    let req = request.into_inner();
+    // Fields validation
+    validate_dto(&*request)?;
 
-    // Validate
-    if req.title.trim().is_empty() {
-        return Err(ApiError::ValidationError(
-            "Title cannot be empty".to_string(),
-        ));
-    }
-    if req.price.is_sign_negative() {
-        return Err(ApiError::ValidationError(
-            "Price cannot be negative".to_string(),
-        ));
-    }
-    if req.stock_quantity < 0 {
-        return Err(ApiError::ValidationError(
-            "Stock quantity cannot be negative".to_string(),
-        ));
-    }
+    let req = request.into_inner();
 
     log::info!("Admin {} creating product: {}", admin.0.user_id, req.title);
 
@@ -288,35 +275,16 @@ pub async fn update_product(
     id: String,
     request: Json<UpdateProductRequest>,
 ) -> Result<Json<ProductDto>, ApiError> {
+    // Validate Uuid
     let product_id = Uuid::parse_str(&id).map_err(|e| {
         log::warn!("Invalid product UUID: {}", e);
         ApiError::ValidationError("Invalid product ID format".to_string())
     })?;
 
-    let req = request.into_inner();
+    // Validate fields
+    validate_dto(&*request)?;
 
-    // Validate
-    if let Some(ref title) = req.title {
-        if title.trim().is_empty() {
-            return Err(ApiError::ValidationError(
-                "Title cannot be empty".to_string(),
-            ));
-        }
-    }
-    if let Some(price) = req.price {
-        if price.is_sign_negative() {
-            return Err(ApiError::ValidationError(
-                "Price cannot be negative".to_string(),
-            ));
-        }
-    }
-    if let Some(stock) = req.stock_quantity {
-        if stock < 0 {
-            return Err(ApiError::ValidationError(
-                "Stock quantity cannot be negative".to_string(),
-            ));
-        }
-    }
+    let req = request.into_inner();
 
     log::info!("Admin {} updating product: {}", admin.0.user_id, product_id);
 

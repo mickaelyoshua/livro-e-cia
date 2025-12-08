@@ -10,6 +10,7 @@ use crate::{
     error::ApiError,
     models::{roles::Role, user::User},
     schema::{roles, users},
+    utils::validate_dto,
 };
 
 const REFRESH_TOKEN_EXPIRY: i64 = 7; // 7 days
@@ -20,6 +21,9 @@ pub async fn login(
     mut db: DbConnection,
     jwt_secret: &State<String>,
 ) -> Result<Json<AuthResponse>, ApiError> {
+    // Fields validation
+    validate_dto(&*credentials)?;
+
     // Normalize email
     let email = credentials.email.trim().to_lowercase();
 
