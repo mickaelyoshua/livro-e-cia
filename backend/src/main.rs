@@ -9,6 +9,7 @@ mod error;
 mod models;
 mod routes;
 mod schema;
+mod utils;
 
 // Macro for Rocket application entry point
 // Replace #[rocker::main]
@@ -41,6 +42,11 @@ fn rocket() -> _ {
             routes::create_product,
             routes::update_product,
             routes::delete_product,
+            routes::list_employees,
+            routes::get_employee,
+            routes::create_employee,
+            routes::update_employee,
+            routes::delete_employee,
         ],
     )
 }
