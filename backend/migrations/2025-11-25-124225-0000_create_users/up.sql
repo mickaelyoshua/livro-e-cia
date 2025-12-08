@@ -29,10 +29,14 @@ CREATE TRIGGER update_users_updated_at
 
 -- Constraints
 ALTER TABLE users ADD CONSTRAINT check_email_format
-	CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
+    CHECK (email ~* '^[a-zA-Z0-9][a-zA-Z0-9._%+-]*[a-zA-Z0-9]@[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$');
+COMMENT ON CONSTRAINT check_email_format ON users IS
+    'Validates email format at database level (no leading/trailing dots)';
 
 ALTER TABLE users ADD CONSTRAINT check_password_hash_length
-	CHECK (LENGTH(password_hash) >= 50);
+	CHECK (LENGTH(password_hash) >= 90);
+COMMENT ON CONSTRAINT check_password_hash_length ON users IS
+	'Argon2id hashes are typically 90-100 characters';
 
 ALTER TABLE users ADD CONSTRAINT check_name_not_empty
 	CHECK (LENGTH(TRIM(name)) > 0);
