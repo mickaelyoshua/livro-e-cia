@@ -7,6 +7,10 @@ authors.workspace = true
 [dependencies]
 # Shared dependencies from workspace
 rust_decimal = { version = "1.39", features = ["serde"] }
+
+# Validation
+validator = { version = "0.20", features = ["derive"] }
+
 serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
