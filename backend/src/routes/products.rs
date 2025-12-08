@@ -10,7 +10,7 @@ use crate::{
     error::ApiError,
     models::{Category, NewProduct, Product, UpdateProduct},
     schema::{categories, products},
-    utils::validate_dto,
+    utils::{parse_uuid, validate_dto, Pagination},
 };
 
 // ========== Query Parameters ==========
@@ -33,18 +33,17 @@ pub async fn list_products(
     query: ProductQuery,
     _user: AuthUser,
 ) -> Result<Json<PaginatedResponse<ProductDto>>, ApiError> {
-    let page = query.page.unwrap_or(1).max(1);
-    let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
-    let offset = (page - 1) * per_page;
+    let pagination = Pagination::new(query.page, query.per_page);
 
-    log::info!("Listing products: page={}, per_page={}", page, per_page);
+    log::info!(
+        "Listing products: page={}, per_page={}",
+        pagination.page,
+        pagination.per_page
+    );
 
     // Validate category_id
     let category_filter = if let Some(cat_id_str) = query.category_id {
-        Some(Uuid::parse_str(&cat_id_str).map_err(|e| {
-            log::warn!("Invalid category_id UUID: {}", e);
-            ApiError::ValidationError("Invalid category_id format".to_string())
-        })?)
+        Some(parse_uuid(&cat_id_str, "category")?)
     } else {
         None
     };
@@ -123,8 +122,8 @@ pub async fn list_products(
     // Get paginated result
     let results = build_filtered_query()
         .select((Product::as_select(), Category::as_select()))
-        .limit(per_page)
-        .offset(offset)
+        .limit(pagination.per_page)
+        .offset(pagination.offset)
         .load::<(Product, Category)>(&mut db.0)
         .map_err(|e| {
             log::error!("Failed to load products: {}", e);
@@ -136,19 +135,19 @@ pub async fn list_products(
         .map(|(product, category)| product.into_dto(category))
         .collect();
 
-    let total_pages = (total_count as f64 / per_page as f64).ceil() as i64;
+    let total_pages = pagination.total_pages(total_count);
 
     log::info!(
         "Retrieved {} products (page {}/{})",
         product_dtos.len(),
-        page,
+        pagination.page,
         total_pages
     );
 
     Ok(Json(PaginatedResponse {
         data: product_dtos,
-        page,
-        per_page,
+        page: pagination.page,
+        per_page: pagination.per_page,
         total_count,
         total_pages,
     }))
@@ -162,10 +161,7 @@ pub async fn get_product(
     id: String,
     _user: AuthUser,
 ) -> Result<Json<ProductDto>, ApiError> {
-    let product_id = Uuid::parse_str(&id).map_err(|e| {
-        log::warn!("Invalid product UUID: {}", e);
-        ApiError::ValidationError("Invalid Product ID format".to_string())
-    })?;
+    let product_id = parse_uuid(&id, "product")?;
 
     log::info!("Fetching product: {}", product_id);
 
@@ -276,10 +272,7 @@ pub async fn update_product(
     request: Json<UpdateProductRequest>,
 ) -> Result<Json<ProductDto>, ApiError> {
     // Validate Uuid
-    let product_id = Uuid::parse_str(&id).map_err(|e| {
-        log::warn!("Invalid product UUID: {}", e);
-        ApiError::ValidationError("Invalid product ID format".to_string())
-    })?;
+    let product_id = parse_uuid(&id, "product")?;
 
     // Validate fields
     validate_dto(&*request)?;
@@ -370,10 +363,7 @@ pub async fn delete_product(
     admin: AdminGuard,
     id: String,
 ) -> Result<Json<Value>, ApiError> {
-    let product_id = Uuid::parse_str(&id).map_err(|e| {
-        log::warn!("Invalid product UUID: {}", e);
-        ApiError::ValidationError("Invalid product ID format".to_string())
-    })?;
+    let product_id = parse_uuid(&id, "product")?;
 
     log::info!("Admin {} deleting product: {}", admin.0.user_id, product_id);
 
