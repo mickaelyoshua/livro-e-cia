@@ -61,10 +61,16 @@ pub async fn login(
 
     // Update last_login_at timestamp (ignore errors - non-critical)
     use chrono::Utc;
-    diesel::update(users::table.find(user.id))
+    if let Err(e) = diesel::update(users::table.find(user.id))
         .set(users::last_login_at.eq(Some(Utc::now())))
         .execute(&mut db.0)
-        .ok();
+    {
+        log::warn!(
+            "Failed to update 'last_login_at' for user {}: {}",
+            user.id,
+            e
+        );
+    }
 
     log::info!("Successful login: {}", email);
 
