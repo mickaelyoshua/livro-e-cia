@@ -1,12 +1,13 @@
 use diesel::prelude::*;
-use rocket::{delete, get, http::Status, post, put, serde::json::Json, FromForm};
+use rocket::{delete, get, http::Status, post, put, serde::json::Json, FromForm, State};
 use serde_json::Value;
 use shared::{CreateEmployeeRequest, PaginatedResponse, UpdateEmployeeRequest, UserDto};
 use uuid::Uuid;
 
 use crate::{
-    auth::{hash_password, AdminGuard},
+    auth::{hash_password, hash_token, AdminGuard},
     db::DbConnection,
+    email::EmailService,
     error::ApiError,
     models::{NewUser, Role, UpdateUser, User},
     schema::{roles, users},
@@ -157,6 +158,7 @@ pub async fn create_employee(
     mut db: DbConnection,
     admin: AdminGuard,
     request: Json<CreateEmployeeRequest>,
+    email_service: &State<Box<dyn EmailService>>,
 ) -> Result<(Status, Json<UserDto>), ApiError> {
     // Validation using validator crate
     validate_dto(&*request)?;
@@ -246,9 +248,12 @@ pub async fn create_employee(
     use chrono::{Duration, Utc};
     let token_expiry = Utc::now() + Duration::days(7);
 
+    let token_hash = hash_token(&verification_token);
+    // Note: The raw 'verification_token' is what will be sent to the user via email,
+    // the hash will be stored.
     diesel::update(users::table.filter(users::id.eq(inserted.id)))
         .set((
-            users::password_reset_token.eq(Some(verification_token.clone())),
+            users::password_reset_token.eq(Some(token_hash)),
             users::password_reset_expires_at.eq(Some(token_expiry)),
         ))
         .execute(&mut db.0)
@@ -269,8 +274,12 @@ pub async fn create_employee(
         })?;
 
     log::info!("Employee {} created: {}", user.id, user.email);
-    // TODO: Send verification email
-    // TODO: Send email with verification_token
+
+    if let Err(e) =
+        email_service.send_verification_email(&user.email, &user.name, &verification_token)
+    {
+        log::error!("Failed to send verification email to {}: {}", user.email, e);
+    }
 
     Ok((Status::Created, Json(user.into_dto(role))))
 }
