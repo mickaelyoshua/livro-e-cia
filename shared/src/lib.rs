@@ -206,7 +206,7 @@ pub struct LogoutRequest {
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct ForgotPasswordRequest {
-    #[validate(email)]
+    #[validate(email(message = "Invalid email format"))]
     pub email: String,
 }
 
@@ -215,7 +215,7 @@ pub struct ResetPasswordRequest {
     #[validate(length(min = 1))]
     pub token: String,
     #[validate(
-        length(min = 8, max = 128),
+        length(min = 8, max = 128, message = "Passowrd mut be at least 8 characters"),
         custom(function = "validate_password_strength")
     )]
     pub new_password: String,

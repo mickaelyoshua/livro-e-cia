@@ -11,7 +11,7 @@ use crate::{
     schema::{refresh_tokens, users},
 };
 
-fn hash_token(token: &str) -> String {
+pub fn hash_token(token: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(token.as_bytes());
     hex::encode(hasher.finalize())
