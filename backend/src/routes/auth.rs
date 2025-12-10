@@ -13,6 +13,10 @@ use crate::{
     email::EmailService,
     error::ApiError,
     models::{roles::Role, user::User, UpdateUser},
+    rate_limit::{
+        RateLimitedForgotPassword, RateLimitedLogin, RateLimitedResetPassword,
+        RateLimitedVerifyEmail,
+    },
     schema::{roles, users},
     utils::validate_dto,
 };
@@ -22,6 +26,7 @@ const PASSWORD_RESET_TOKEN_EXPIRY_HOURS: i64 = 1; // 1 hour for security
 
 #[post("/api/v1/auth/login", format = "json", data = "<credentials>")]
 pub async fn login(
+    _rate_limit: RateLimitedLogin,
     credentials: Json<LoginRequest>,
     mut db: DbConnection,
     jwt_secret: &State<String>,
@@ -164,6 +169,7 @@ pub async fn refresh_token(
 
 #[post("/api/v1/auth/verify-email", format = "json", data = "<request>")]
 pub async fn verify_email(
+    _rate_limit: RateLimitedVerifyEmail,
     request: Json<VerifyEmailRequest>,
     mut db: DbConnection,
 ) -> Result<Json<Value>, ApiError> {
@@ -221,6 +227,7 @@ pub async fn verify_email(
 
 #[post("/api/v1/auth/forgot-password", format = "json", data = "<request>")]
 pub async fn forgot_password(
+    _rate_limit: RateLimitedForgotPassword,
     request: Json<ForgotPasswordRequest>,
     mut db: DbConnection,
     email_service: &State<Box<dyn EmailService>>,
@@ -301,6 +308,7 @@ pub async fn forgot_password(
 
 #[post("/api/v1/auth/reset-password", format = "json", data = "<request>")]
 pub async fn reset_password(
+    _rate_limit: RateLimitedResetPassword,
     request: Json<ResetPasswordRequest>,
     mut db: DbConnection,
 ) -> Result<Json<Value>, ApiError> {
