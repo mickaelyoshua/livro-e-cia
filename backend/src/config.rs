@@ -34,6 +34,7 @@ pub struct AppConfig {
     pub database_url: String,
     pub jwt_secret: String,
     pub cors_origins: Vec<String>,
+    pub redis_url: String,
 }
 
 impl AppConfig {
@@ -51,6 +52,9 @@ impl AppConfig {
             });
         }
 
+        let redis_url = env::var("REDIS_URL")
+            .map_err(|_| ConfigError::MissingEnvVar("REDIS_URL".to_string()))?;
+
         let cors_origins = env::var("CORS_ORIGINS")
             .unwrap_or_else(|_| "http://localhost:8080".to_string())
             .split(',')
@@ -62,6 +66,7 @@ impl AppConfig {
             database_url,
             jwt_secret,
             cors_origins,
+            redis_url,
         })
     }
 

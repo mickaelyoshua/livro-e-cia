@@ -6,6 +6,7 @@ pub mod db;
 pub mod email;
 pub mod error;
 pub mod models;
+pub mod rate_limit;
 pub mod redis;
 pub mod routes;
 pub mod schema;
