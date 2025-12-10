@@ -1,5 +1,5 @@
 use dotenv::dotenv;
-use rocket::launch;
+use rocket::{fairing::AdHoc, launch};
 
 use crate::{
     config::AppConfig,
@@ -14,6 +14,7 @@ mod email;
 mod error;
 mod fairings;
 mod models;
+mod rate_limit;
 mod redis;
 mod routes;
 mod schema;
@@ -33,6 +34,9 @@ fn rocket() -> _ {
         eprintln!("FATAL: configuration error: {}", e);
         std::process::exit(1);
     });
+
+    // Store redis_url for async initialization (config.jwt_secret will be consumed by .manage())
+    let redis_url = config.redis_url.clone();
 
     let cors = config.cors().expect("Failed to create CORS configuration");
 
@@ -73,6 +77,20 @@ fn rocket() -> _ {
         .manage(email_service)
         .attach(cors)
         .attach(SecurityHeaders)
+        // Redis initialization (async, runs during Rocket ignite phase)
+        .attach(AdHoc::on_ignite("Redis Pool", |rocket| async move {
+            match crate::redis::init_redis_pool(&redis_url).await {
+                Ok(redis_pool) => {
+                    log::info!("Redis connection established");
+                    rocket.manage(redis_pool)
+                }
+                Err(e) => {
+                    // Fail-open: app starts but rate limiting disabled
+                    log::error!("Failed to connect to Redis: {}. Rate limiting disabled.", e);
+                    rocket
+                }
+            }
+        }))
         .mount(
             "/",
             rocket::routes![
