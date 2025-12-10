@@ -3,7 +3,7 @@ use std::io::Cursor;
 use argon2::password_hash::Error as ArgonError;
 use diesel::result::Error as DieselError;
 use rocket::{
-    http::{ContentType, Status},
+    http::{ContentType, Header, Status},
     response::{self, Responder, Response},
     serde::json::json,
     Request,
@@ -40,12 +40,23 @@ pub enum ApiError {
 
     #[error("Invalid token: {0}")]
     JwtError(String),
+
+    #[error("Rate limit exceeded")]
+    RateLimitExceeded { retry_after_seconds: u64 },
 }
 
 // Responder trait is Rocket's way of converting types into HTTP responses.
 // When the route return a Result<T, ApiError> it will call 'respond_to'.
 impl<'r> Responder<'r, 'static> for ApiError {
     fn respond_to(self, _request: &'r Request<'_>) -> response::Result<'static> {
+        // Extract retry_after before consuming self in match
+        let retry_after = match &self {
+            ApiError::RateLimitExceeded {
+                retry_after_seconds,
+            } => Some(*retry_after_seconds),
+            _ => None,
+        };
+
         let (status, message) = match &self {
             ApiError::NotFound(msg) => (Status::NotFound, msg.clone()),
             ApiError::DatabaseError(err) => {
@@ -78,6 +89,9 @@ impl<'r> Responder<'r, 'static> for ApiError {
                 log::warn!("JWT error: {}", msg);
                 (Status::Unauthorized, "Invalid or expired token".to_string())
             }
+            ApiError::RateLimitExceeded { .. } => {
+                (Status::TooManyRequests, "Too many requests. Please try again later.".to_string())
+            }
         };
 
         let body = json!({
@@ -86,13 +100,19 @@ impl<'r> Responder<'r, 'static> for ApiError {
         })
         .to_string();
 
-        Response::build()
+        let mut builder = Response::build();
+        builder
             .status(status)
             .header(ContentType::JSON)
             // 'sized_body' needs a type that implement the Read trait, String does not.
             // Cursor will wrap the type and implement the Read trait
-            .sized_body(body.len(), Cursor::new(body))
-            .ok()
+            .sized_body(body.len(), Cursor::new(body));
+
+        if let Some(seconds) = retry_after {
+            builder.header(Header::new("Retry-After", seconds.to_string()));
+        }
+
+        builder.ok()
     }
 }
 
