@@ -125,3 +125,76 @@ impl From<ArgonError> for ApiError {
         ApiError::PasswordError(format!("Password error: {:?}", value))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn not_found_display_includes_resource() {
+        let err = ApiError::NotFound("User".to_string());
+        assert_eq!(format!("{}", err), "Not found: User");
+    }
+
+    #[test]
+    fn validation_error_display_includes_message() {
+        let err = ApiError::ValidationError("email: Invalid format".to_string());
+        assert_eq!(format!("{}", err), "Validation error: email: Invalid format");
+    }
+
+    #[test]
+    fn database_error_display_is_generic() {
+        let err = ApiError::DatabaseError(DieselError::NotFound);
+        assert_eq!(format!("{}", err), "Database error");
+    }
+
+    #[test]
+    fn internal_error_display_is_generic() {
+        let err = ApiError::InternalError("secret details".to_string());
+        assert_eq!(format!("{}", err), "Internal server error");
+    }
+
+    #[test]
+    fn unauthorized_display() {
+        let err = ApiError::Unauthorized("Invalid credentials".to_string());
+        assert_eq!(format!("{}", err), "Authentication failed: Invalid credentials");
+    }
+
+    #[test]
+    fn forbidden_display() {
+        let err = ApiError::Forbidden("Admin only".to_string());
+        assert_eq!(format!("{}", err), "Access forbidden: Admin only");
+    }
+
+    #[test]
+    fn password_error_display_is_generic() {
+        let err = ApiError::PasswordError("argon2 internal".to_string());
+        assert_eq!(format!("{}", err), "Password operation failed");
+    }
+
+    #[test]
+    fn jwt_error_display() {
+        let err = ApiError::JwtError("expired".to_string());
+        assert_eq!(format!("{}", err), "Invalid token: expired");
+    }
+
+    #[test]
+    fn rate_limit_display() {
+        let err = ApiError::RateLimitExceeded { retry_after_seconds: 60 };
+        assert_eq!(format!("{}", err), "Rate limit exceeded");
+    }
+
+    #[test]
+    fn diesel_error_converts_to_database_error() {
+        let diesel_err = DieselError::NotFound;
+        let api_err: ApiError = diesel_err.into();
+        assert!(matches!(api_err, ApiError::DatabaseError(_)));
+    }
+
+    #[test]
+    fn argon_error_converts_to_password_error() {
+        let argon_err = ArgonError::Password;
+        let api_err: ApiError = argon_err.into();
+        assert!(matches!(api_err, ApiError::PasswordError(_)));
+    }
+}

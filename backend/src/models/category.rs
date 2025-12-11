@@ -36,3 +36,44 @@ impl Category {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    fn sample_category() -> Category {
+        Category {
+            id: Uuid::new_v4(),
+            name: "Fiction".to_string(),
+            description: Some("Fiction books".to_string()),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn into_dto_maps_all_fields() {
+        let category = sample_category();
+        let id = category.id;
+        let dto = category.into_dto();
+        assert_eq!(dto.id, id);
+        assert_eq!(dto.name, "Fiction");
+        assert_eq!(dto.description, Some("Fiction books".to_string()));
+    }
+
+    #[test]
+    fn into_dto_handles_none_description() {
+        let mut category = sample_category();
+        category.description = None;
+        let dto = category.into_dto();
+        assert!(dto.description.is_none());
+    }
+
+    #[test]
+    fn into_dto_omits_timestamps() {
+        // Compile-time verification: CategoryDto has no created_at/updated_at
+        let category = sample_category();
+        let _dto: shared::CategoryDto = category.into_dto();
+    }
+}
