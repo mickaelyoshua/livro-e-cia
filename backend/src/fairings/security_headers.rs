@@ -4,7 +4,17 @@ use rocket::{
     Request, Response,
 };
 
-pub struct SecurityHeaders;
+use crate::config::Environment;
+
+pub struct SecurityHeaders {
+    environment: Environment,
+}
+
+impl SecurityHeaders {
+    pub fn new(environment: Environment) -> Self {
+        Self { environment }
+    }
+}
 
 #[rocket::async_trait]
 impl Fairing for SecurityHeaders {
@@ -35,6 +45,19 @@ impl Fairing for SecurityHeaders {
         res.set_header(Header::new(
             "Content-Security-Policy",
             "default-src 'self'; frame-ancestors 'none'",
+        ));
+
+        // HSTS onlu if production/staging (requires HTTPS)
+        if !self.environment.is_development() {
+            res.set_header(Header::new(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains",
+            ));
+        }
+
+        res.set_header(Header::new(
+            "Permissions-Policy",
+            "geolocation=(), microphone=(), camera=()",
         ));
     }
 }
