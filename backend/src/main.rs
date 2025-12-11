@@ -35,6 +35,12 @@ fn rocket() -> _ {
         std::process::exit(1);
     });
 
+    log::info!(
+        "Starting server in {} environment",
+        config.environment.name()
+    );
+
+    let environment = config.environment;
     // Store redis_url for async initialization (config.jwt_secret will be consumed by .manage())
     let redis_url = config.redis_url.clone();
 
@@ -45,7 +51,13 @@ fn rocket() -> _ {
 
     let email_config = EmailConfig::from_env();
     let email_service: Box<dyn EmailService> = match std::env::var("EMAIL_PROVIDER")
-        .unwrap_or_else(|_| "mock".to_string())
+        .unwrap_or_else(|_| {
+            if environment.is_production() {
+                "smtp".to_string()
+            } else {
+                "mock".to_string()
+            }
+        })
         .as_str()
     {
         "smtp" => {
@@ -62,6 +74,9 @@ fn rocket() -> _ {
             )
         }
         _ => {
+            if environment.is_production() {
+                panic!("Mock email service not allowed in production, Set EMAIL_PROVIDER=smtp");
+            }
             log::info!("Using mock email service (emails logged to console)");
             Box::new(MockEmailService::new(email_config))
         }
@@ -75,18 +90,22 @@ fn rocket() -> _ {
         .manage(config.jwt_secret)
         .manage(pool)
         .manage(email_service)
+        .manage(environment)
         .attach(cors)
-        .attach(SecurityHeaders)
+        .attach(SecurityHeaders::new(environment))
         // Redis initialization (async, runs during Rocket ignite phase)
-        .attach(AdHoc::on_ignite("Redis Pool", |rocket| async move {
+        .attach(AdHoc::on_ignite("Redis Pool", move |rocket| async move {
             match crate::redis::init_redis_pool(&redis_url).await {
                 Ok(redis_pool) => {
                     log::info!("Redis connection established");
                     rocket.manage(redis_pool)
                 }
                 Err(e) => {
-                    // Fail-open: app starts but rate limiting disabled
-                    log::error!("Failed to connect to Redis: {}. Rate limiting disabled.", e);
+                    if environment.is_production() {
+                        panic!("Redis required in production: {}", e);
+                    }
+                    log::warn!("Redis connnection failed: {}. Rate limiting disabled.", e);
+
                     rocket
                 }
             }
