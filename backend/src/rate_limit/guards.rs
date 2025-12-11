@@ -87,7 +87,7 @@ impl<'r> FromRequest<'r> for RateLimitedForgotPassword {
 
         let ip = get_client_ip(req);
         let mut redis_conn = redis.inner().clone();
-        let config = RateLimitConfig::login(environment);
+        let config = RateLimitConfig::forgot_password(environment);
 
         match check_rate_limit(&mut redis_conn, &config, &ip).await {
             Ok(result) if result.allowed => Outcome::Success(RateLimitedForgotPassword),
@@ -131,7 +131,7 @@ impl<'r> FromRequest<'r> for RateLimitedResetPassword {
 
         let ip = get_client_ip(req);
         let mut redis_conn = redis.inner().clone();
-        let config = RateLimitConfig::login(environment);
+        let config = RateLimitConfig::reset_password(environment);
 
         match check_rate_limit(&mut redis_conn, &config, &ip).await {
             Ok(result) if result.allowed => Outcome::Success(RateLimitedResetPassword),
@@ -175,7 +175,7 @@ impl<'r> FromRequest<'r> for RateLimitedVerifyEmail {
 
         let ip = get_client_ip(req);
         let mut redis_conn = redis.inner().clone();
-        let config = RateLimitConfig::login(environment);
+        let config = RateLimitConfig::verify_email(environment);
 
         match check_rate_limit(&mut redis_conn, &config, &ip).await {
             Ok(result) if result.allowed => Outcome::Success(RateLimitedVerifyEmail),
