@@ -1,3 +1,5 @@
+use crate::config::Environment;
+
 pub struct RateLimitConfig {
     pub max_requests: u32,
     pub window_seconds: u64,
@@ -5,27 +7,68 @@ pub struct RateLimitConfig {
 }
 
 impl RateLimitConfig {
-    pub const LOGIN: Self = Self {
-        max_requests: 5,
-        window_seconds: 60,
-        key_prefix: "login",
-    };
+    pub fn login(env: Environment) -> Self {
+        match env {
+            Environment::Production => Self {
+                max_requests: 5,
+                window_seconds: 60,
+                key_prefix: "rl:login",
+            },
+            Environment::Staging => Self {
+                max_requests: 10,
+                window_seconds: 60,
+                key_prefix: "rl:login",
+            },
+            Environment::Development => Self {
+                max_requests: 100,
+                window_seconds: 60,
+                key_prefix: "rl:login",
+            },
+        }
+    }
 
-    pub const FORGOT_PASSWORD: Self = Self {
-        max_requests: 3,
-        window_seconds: 3600, // 1 hour
-        key_prefix: "forgot_password",
-    };
+    pub fn forgot_password(env: Environment) -> Self {
+        match env {
+            Environment::Production | Environment::Staging => Self {
+                max_requests: 3,
+                window_seconds: 3600,
+                key_prefix: "rl:forgot_pwd",
+            },
+            Environment::Development => Self {
+                max_requests: 50,
+                window_seconds: 60,
+                key_prefix: "rl:forgot_pwd",
+            },
+        }
+    }
 
-    pub const RESET_PASSWORD: Self = Self {
-        max_requests: 5,
-        window_seconds: 60,
-        key_prefix: "reset_password",
-    };
+    pub fn reset_password(env: Environment) -> Self {
+        match env {
+            Environment::Production | Environment::Staging => Self {
+                max_requests: 5,
+                window_seconds: 60,
+                key_prefix: "rl:reset_pwd",
+            },
+            Environment::Development => Self {
+                max_requests: 50,
+                window_seconds: 60,
+                key_prefix: "rl:reset_pwd",
+            },
+        }
+    }
 
-    pub const VERIFY_EMAIL: Self = Self {
-        max_requests: 10,
-        window_seconds: 60,
-        key_prefix: "verify_email",
-    };
+    pub fn verify_email(env: Environment) -> Self {
+        match env {
+            Environment::Production | Environment::Staging => Self {
+                max_requests: 10,
+                window_seconds: 60,
+                key_prefix: "rl:verify",
+            },
+            Environment::Development => Self {
+                max_requests: 100,
+                window_seconds: 60,
+                key_prefix: "rl:verify",
+            },
+        }
+    }
 }

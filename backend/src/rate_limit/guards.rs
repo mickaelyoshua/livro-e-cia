@@ -5,6 +5,7 @@ use rocket::{
 };
 
 use crate::{
+    config::Environment,
     error::ApiError,
     rate_limit::{check_rate_limit, RateLimitConfig},
     redis::RedisPool,
@@ -27,6 +28,11 @@ impl<'r> FromRequest<'r> for RateLimitedLogin {
     type Error = ApiError;
 
     async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        let environment = match req.guard::<&State<Environment>>().await {
+            Outcome::Success(e) => *e.inner(),
+            _ => Environment::Development,
+        };
+
         let redis = match req.guard::<&State<RedisPool>>().await {
             Outcome::Success(r) => r,
             _ => {
@@ -37,8 +43,9 @@ impl<'r> FromRequest<'r> for RateLimitedLogin {
 
         let ip = get_client_ip(req);
         let mut redis_conn = redis.inner().clone();
+        let config = RateLimitConfig::login(environment);
 
-        match check_rate_limit(&mut redis_conn, &RateLimitConfig::LOGIN, &ip).await {
+        match check_rate_limit(&mut redis_conn, &config, &ip).await {
             Ok(result) if result.allowed => Outcome::Success(RateLimitedLogin),
             Ok(result) => {
                 log::warn!("Rate limit exceeded for login from IP: {}", ip);
@@ -47,7 +54,7 @@ impl<'r> FromRequest<'r> for RateLimitedLogin {
                     ApiError::RateLimitExceeded {
                         retry_after_seconds: result
                             .retry_after_seconds
-                            .unwrap_or(RateLimitConfig::LOGIN.window_seconds),
+                            .unwrap_or(config.window_seconds),
                     },
                 ))
             }
@@ -65,6 +72,11 @@ impl<'r> FromRequest<'r> for RateLimitedForgotPassword {
     type Error = ApiError;
 
     async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        let environment = match req.guard::<&State<Environment>>().await {
+            Outcome::Success(e) => *e.inner(),
+            _ => Environment::Development,
+        };
+
         let redis = match req.guard::<&State<RedisPool>>().await {
             Outcome::Success(r) => r,
             _ => {
@@ -75,8 +87,9 @@ impl<'r> FromRequest<'r> for RateLimitedForgotPassword {
 
         let ip = get_client_ip(req);
         let mut redis_conn = redis.inner().clone();
+        let config = RateLimitConfig::login(environment);
 
-        match check_rate_limit(&mut redis_conn, &RateLimitConfig::FORGOT_PASSWORD, &ip).await {
+        match check_rate_limit(&mut redis_conn, &config, &ip).await {
             Ok(result) if result.allowed => Outcome::Success(RateLimitedForgotPassword),
             Ok(result) => {
                 log::warn!("Rate limit exceeded for forgot password from IP: {}", ip);
@@ -85,7 +98,7 @@ impl<'r> FromRequest<'r> for RateLimitedForgotPassword {
                     ApiError::RateLimitExceeded {
                         retry_after_seconds: result
                             .retry_after_seconds
-                            .unwrap_or(RateLimitConfig::FORGOT_PASSWORD.window_seconds),
+                            .unwrap_or(config.window_seconds),
                     },
                 ))
             }
@@ -103,6 +116,11 @@ impl<'r> FromRequest<'r> for RateLimitedResetPassword {
     type Error = ApiError;
 
     async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        let environment = match req.guard::<&State<Environment>>().await {
+            Outcome::Success(e) => *e.inner(),
+            _ => Environment::Development,
+        };
+
         let redis = match req.guard::<&State<RedisPool>>().await {
             Outcome::Success(r) => r,
             _ => {
@@ -113,8 +131,9 @@ impl<'r> FromRequest<'r> for RateLimitedResetPassword {
 
         let ip = get_client_ip(req);
         let mut redis_conn = redis.inner().clone();
+        let config = RateLimitConfig::login(environment);
 
-        match check_rate_limit(&mut redis_conn, &RateLimitConfig::RESET_PASSWORD, &ip).await {
+        match check_rate_limit(&mut redis_conn, &config, &ip).await {
             Ok(result) if result.allowed => Outcome::Success(RateLimitedResetPassword),
             Ok(result) => {
                 log::warn!("Rate limit exceeded for reset password from IP: {}", ip);
@@ -123,7 +142,7 @@ impl<'r> FromRequest<'r> for RateLimitedResetPassword {
                     ApiError::RateLimitExceeded {
                         retry_after_seconds: result
                             .retry_after_seconds
-                            .unwrap_or(RateLimitConfig::RESET_PASSWORD.window_seconds),
+                            .unwrap_or(config.window_seconds),
                     },
                 ))
             }
@@ -141,6 +160,11 @@ impl<'r> FromRequest<'r> for RateLimitedVerifyEmail {
     type Error = ApiError;
 
     async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        let environment = match req.guard::<&State<Environment>>().await {
+            Outcome::Success(e) => *e.inner(),
+            _ => Environment::Development,
+        };
+
         let redis = match req.guard::<&State<RedisPool>>().await {
             Outcome::Success(r) => r,
             _ => {
@@ -151,8 +175,9 @@ impl<'r> FromRequest<'r> for RateLimitedVerifyEmail {
 
         let ip = get_client_ip(req);
         let mut redis_conn = redis.inner().clone();
+        let config = RateLimitConfig::login(environment);
 
-        match check_rate_limit(&mut redis_conn, &RateLimitConfig::VERIFY_EMAIL, &ip).await {
+        match check_rate_limit(&mut redis_conn, &config, &ip).await {
             Ok(result) if result.allowed => Outcome::Success(RateLimitedVerifyEmail),
             Ok(result) => {
                 log::warn!("Rate limit exceeded for verify email from IP: {}", ip);
@@ -161,7 +186,7 @@ impl<'r> FromRequest<'r> for RateLimitedVerifyEmail {
                     ApiError::RateLimitExceeded {
                         retry_after_seconds: result
                             .retry_after_seconds
-                            .unwrap_or(RateLimitConfig::VERIFY_EMAIL.window_seconds),
+                            .unwrap_or(config.window_seconds),
                     },
                 ))
             }
