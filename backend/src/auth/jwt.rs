@@ -104,3 +104,99 @@ pub fn validate_token(token: &str, secret: &str) -> Result<Claims, JwtError> {
     })?;
     Ok(token_data.claims)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_SECRET: &str = "test-secret-at-least-32-bytes-long!!";
+
+    #[test]
+    fn generate_access_token_creates_valid_jwt() {
+        let user_id = Uuid::new_v4();
+        let token = generate_access_token(user_id, "admin", TEST_SECRET)
+            .expect("Should generate token");
+        assert_eq!(token.split('.').count(), 3);
+    }
+
+    #[test]
+    fn generate_access_token_includes_correct_claims() {
+        let user_id = Uuid::new_v4();
+        let token = generate_access_token(user_id, "employee", TEST_SECRET)
+            .expect("Should generate token");
+        let claims = validate_token(&token, TEST_SECRET)
+            .expect("Should validate own token");
+
+        assert_eq!(claims.id, user_id.to_string());
+        assert_eq!(claims.role, "employee");
+        assert_eq!(claims.token_type, "access");
+    }
+
+    #[test]
+    fn generate_refresh_token_has_different_type() {
+        let user_id = Uuid::new_v4();
+        let token = generate_refresh_token(user_id, "admin", TEST_SECRET)
+            .expect("Should generate token");
+        let claims = validate_token(&token, TEST_SECRET).expect("Should validate");
+
+        assert_eq!(claims.token_type, "refresh");
+    }
+
+    #[test]
+    fn access_token_expires_after_30_minutes() {
+        let user_id = Uuid::new_v4();
+        let token = generate_access_token(user_id, "admin", TEST_SECRET)
+            .expect("Should generate token");
+        let claims = validate_token(&token, TEST_SECRET).expect("Should validate");
+
+        let now = Utc::now().timestamp();
+        let expected_expiry = now + (30 * 60);
+        assert!((claims.exp - expected_expiry).abs() < 5);
+    }
+
+    #[test]
+    fn refresh_token_expires_after_7_days() {
+        let user_id = Uuid::new_v4();
+        let token = generate_refresh_token(user_id, "admin", TEST_SECRET)
+            .expect("Should generate token");
+        let claims = validate_token(&token, TEST_SECRET).expect("Should validate");
+
+        let now = Utc::now().timestamp();
+        let expected_expiry = now + (7 * 24 * 60 * 60);
+        assert!((claims.exp - expected_expiry).abs() < 5);
+    }
+
+    #[test]
+    fn validate_token_rejects_wrong_secret() {
+        let user_id = Uuid::new_v4();
+        let token = generate_access_token(user_id, "admin", TEST_SECRET)
+            .expect("Should generate");
+
+        let result = validate_token(&token, "different-secret-32-bytes-long!!");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validate_token_rejects_malformed_token() {
+        let result = validate_token("not.a.valid.jwt", TEST_SECRET);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validate_token_rejects_empty_token() {
+        let result = validate_token("", TEST_SECRET);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn handles_unicode_in_role() {
+        let user_id = Uuid::new_v4();
+        let role = "administrador";
+
+        let token = generate_access_token(user_id, role, TEST_SECRET)
+            .expect("Should generate");
+        let claims = validate_token(&token, TEST_SECRET).expect("Should validate");
+
+        assert_eq!(claims.role, role);
+    }
+}

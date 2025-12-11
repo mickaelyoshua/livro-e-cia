@@ -162,3 +162,42 @@ pub fn cleanup_expired_tokens(db: &mut PgConnection) -> Result<usize, ApiError> 
 
     Ok(count)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hash_token_produces_sha256_hex() {
+        let hash = hash_token("test-token-123");
+        assert_eq!(hash.len(), 64);
+        assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn hash_token_is_deterministic() {
+        let hash1 = hash_token("same-token");
+        let hash2 = hash_token("same-token");
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn hash_token_produces_different_hashes_for_different_tokens() {
+        let hash1 = hash_token("token1");
+        let hash2 = hash_token("token2");
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn hash_token_is_case_sensitive() {
+        let hash_lower = hash_token("token");
+        let hash_upper = hash_token("TOKEN");
+        assert_ne!(hash_lower, hash_upper);
+    }
+
+    #[test]
+    fn hash_token_handles_empty_string() {
+        let hash = hash_token("");
+        assert_eq!(hash, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    }
+}

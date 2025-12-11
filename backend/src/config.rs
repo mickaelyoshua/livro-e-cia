@@ -184,3 +184,146 @@ impl AppConfig {
         // Converts to a Fairing: a middleware. In this case, the CORS fairing (rocket_cors::Cors)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    fn with_env_vars<F, R>(vars: &[(&str, &str)], f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        let originals: Vec<_> = vars.iter().map(|(k, _)| (*k, env::var(k).ok())).collect();
+        for (k, v) in vars {
+            env::set_var(k, v);
+        }
+        let result = f();
+        for (k, original) in originals {
+            match original {
+                Some(v) => env::set_var(k, v),
+                None => env::remove_var(k),
+            }
+        }
+        result
+    }
+
+    #[test]
+    fn environment_from_env_defaults_to_development() {
+        with_env_vars(&[], || {
+            env::remove_var("APP_ENV");
+            assert_eq!(Environment::from_env(), Environment::Development);
+        });
+    }
+
+    #[test]
+    fn environment_recognizes_production() {
+        with_env_vars(&[("APP_ENV", "production")], || {
+            assert_eq!(Environment::from_env(), Environment::Production);
+        });
+        with_env_vars(&[("APP_ENV", "prod")], || {
+            assert_eq!(Environment::from_env(), Environment::Production);
+        });
+    }
+
+    #[test]
+    fn environment_recognizes_staging() {
+        with_env_vars(&[("APP_ENV", "staging")], || {
+            assert_eq!(Environment::from_env(), Environment::Staging);
+        });
+    }
+
+    #[test]
+    fn is_production_returns_correct_values() {
+        assert!(Environment::Production.is_production());
+        assert!(!Environment::Staging.is_production());
+        assert!(!Environment::Development.is_production());
+    }
+
+    #[test]
+    fn is_development_returns_correct_values() {
+        assert!(Environment::Development.is_development());
+        assert!(!Environment::Production.is_development());
+    }
+
+    #[test]
+    fn config_rejects_short_jwt_secret() {
+        with_env_vars(
+            &[
+                ("APP_ENV", "development"),
+                ("DATABASE_URL", "postgres://test"),
+                ("JWT_SECRET", "short"),
+                ("REDIS_URL", "redis://localhost"),
+            ],
+            || {
+                let result = AppConfig::from_env();
+                assert!(matches!(result, Err(ConfigError::WeakJwtSecret { .. })));
+            },
+        );
+    }
+
+    #[test]
+    fn config_accepts_32_byte_jwt_secret() {
+        with_env_vars(
+            &[
+                ("APP_ENV", "development"),
+                ("DATABASE_URL", "postgres://test"),
+                ("JWT_SECRET", "12345678901234567890123456789012"),
+                ("REDIS_URL", "redis://localhost"),
+            ],
+            || {
+                assert!(AppConfig::from_env().is_ok());
+            },
+        );
+    }
+
+    #[test]
+    fn production_requires_ssl_in_database_url() {
+        with_env_vars(
+            &[
+                ("APP_ENV", "production"),
+                ("DATABASE_URL", "postgres://user:pass@host/db"),
+                ("JWT_SECRET", "12345678901234567890123456789012"),
+                ("REDIS_URL", "redis://localhost"),
+                ("CORS_ORIGINS", "https://example.com"),
+            ],
+            || {
+                let result = AppConfig::from_env();
+                assert!(matches!(result, Err(ConfigError::ProductionSecurityViolation(_))));
+            },
+        );
+    }
+
+    #[test]
+    fn production_accepts_sslmode_require() {
+        with_env_vars(
+            &[
+                ("APP_ENV", "production"),
+                ("DATABASE_URL", "postgres://host/db?sslmode=require"),
+                ("JWT_SECRET", "12345678901234567890123456789012"),
+                ("REDIS_URL", "redis://localhost"),
+                ("CORS_ORIGINS", "https://example.com"),
+            ],
+            || {
+                assert!(AppConfig::from_env().is_ok());
+            },
+        );
+    }
+
+    #[test]
+    fn production_requires_cors_origins() {
+        with_env_vars(
+            &[
+                ("APP_ENV", "production"),
+                ("DATABASE_URL", "postgres://host/db?sslmode=require"),
+                ("JWT_SECRET", "12345678901234567890123456789012"),
+                ("REDIS_URL", "redis://localhost"),
+            ],
+            || {
+                env::remove_var("CORS_ORIGINS");
+                let result = AppConfig::from_env();
+                assert!(matches!(result, Err(ConfigError::ProductionSecurityViolation(_))));
+            },
+        );
+    }
+}
