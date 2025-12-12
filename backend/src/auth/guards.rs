@@ -1,6 +1,7 @@
 // Rocket's mechanism for extracting and validating data from HTTP requests
 // Runs before route handler
 
+use diesel::prelude::*;
 use rocket::{
     http::Status,
     request::{FromRequest, Outcome},
@@ -8,7 +9,7 @@ use rocket::{
 };
 use uuid::Uuid;
 
-use crate::{auth::jwt::validate_token, error::ApiError};
+use crate::{auth::jwt::validate_token, db::DbConnection, error::ApiError, schema::users};
 
 pub struct AuthUser {
     pub user_id: Uuid,
@@ -75,6 +76,49 @@ impl<'r> FromRequest<'r> for AuthUser {
                         ))
                     }
                 };
+
+                // Verify user still exists and is active
+                let mut db = match req.guard::<DbConnection>().await {
+                    Outcome::Success(db) => db,
+                    _ => {
+                        log::error!("Database connection unavailable in AuthUser guard");
+                        return Outcome::Error((
+                            Status::InternalServerError,
+                            ApiError::InternalError("Service unavailable".to_string()),
+                        ));
+                    }
+                };
+
+                let is_active: bool = match users::table
+                    .find(user_id)
+                    .select(users::is_active)
+                    .first::<bool>(&mut db.0)
+                    .optional()
+                {
+                    Ok(Some(active)) => active,
+                    Ok(None) => {
+                        log::warn!("Token for non-existent user: {}", user_id);
+                        return Outcome::Error((
+                            Status::Unauthorized,
+                            ApiError::Unauthorized("Invalid token".to_string()),
+                        ));
+                    }
+                    Err(e) => {
+                        log::error!("Database error checking user status: {}", e);
+                        return Outcome::Error((
+                            Status::InternalServerError,
+                            ApiError::InternalError("Service unavailable".to_string()),
+                        ));
+                    }
+                };
+
+                if !is_active {
+                    log::warn!("Token for inactive user: {}", user_id);
+                    return Outcome::Error((
+                        Status::Unauthorized,
+                        ApiError::Unauthorized("Account is inactive".to_string()),
+                    ));
+                }
 
                 Outcome::Success(AuthUser {
                     user_id,
