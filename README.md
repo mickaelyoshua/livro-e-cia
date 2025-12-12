@@ -190,6 +190,107 @@ trunk serve
 ```
 App: `http://localhost:8080`
 
+## Testing
+
+The project has two types of tests:
+
+### Unit Tests
+
+Test individual modules in isolation (JWT, password hashing, validation, etc.):
+
+```bash
+cd backend
+cargo test --lib
+```
+
+### Integration Tests
+
+Test full HTTP request/response cycles with real database:
+
+**Prerequisites:**
+1. PostgreSQL running (via `make docker-up`)
+2. Test database created
+
+**Setup (first time only):**
+```bash
+# Create test database
+createdb livroecia_test
+
+# Run migrations on test database
+DATABASE_URL=postgres://livro_cia_user:your_password@localhost:5432/livroecia_test \
+  diesel migration run
+```
+
+**Run Integration Tests:**
+```bash
+# Run all integration tests (serially - required for database isolation)
+cd backend
+TEST_DATABASE_URL=postgres://livro_cia_user:your_password@localhost:5432/livroecia_test \
+  cargo test --test '*' -- --test-threads=1
+
+# Run specific test file
+cargo test --test auth_tests
+cargo test --test products_tests
+cargo test --test employees_tests
+cargo test --test security_tests
+
+# Run with output (see println! statements)
+cargo test --test auth_tests -- --nocapture
+
+# Run specific test by name
+cargo test --test auth_tests login_valid_credentials
+```
+
+**Test Coverage:**
+
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| `auth_tests.rs` | 26 | Login, /me, refresh, logout, verify-email, password reset |
+| `products_tests.rs` | 18 | CRUD, pagination, filters, admin-only, soft delete |
+| `employees_tests.rs` | 22 | CRUD, pagination, admin-only, role changes |
+| `security_tests.rs` | 13 | Auth bypass, token confusion, enumeration, injection |
+| **Total** | **79** | All 17 API endpoints |
+
+**Test Structure:**
+```
+backend/tests/
+├── common/              # Shared test infrastructure
+│   ├── mod.rs          # Module exports
+│   ├── test_app.rs     # TestApp with Rocket client
+│   ├── fixtures.rs     # Test data factories
+│   └── auth_helpers.rs # JWT token generation
+├── auth_tests.rs       # Authentication tests
+├── products_tests.rs   # Product endpoint tests
+├── employees_tests.rs  # Employee endpoint tests
+└── security_tests.rs   # Security-focused tests
+```
+
+### Run All Tests
+
+**Using Make (recommended):**
+```bash
+# Run all tests (unit + integration)
+make test
+
+# Run only unit tests
+make test-unit
+
+# Run only integration tests
+make test-integration
+
+# Setup test database (run once, or after schema changes)
+make test-db-setup
+```
+
+**Manual commands:**
+```bash
+cd backend
+
+# First, ensure test database exists and is migrated
+TEST_DATABASE_URL=postgres://livro_cia_user:your_password@localhost:5432/livroecia_test \
+  cargo test -- --test-threads=1
+```
+
 ## Security Features
 
 - Argon2id password hashing (OWASP recommended)

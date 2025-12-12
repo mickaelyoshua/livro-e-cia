@@ -1,4 +1,4 @@
-.PHONY: help docker-up docker-stop docker-start docker-down docker-logs docker-ps docker-clean db-setup db-migrate db-migrate-revert db-migrate-redo db-reset db-migration db-psql redis-cli gen-password gen-jwt backend-run frontend-run dev clean
+.PHONY: help docker-up docker-stop docker-start docker-down docker-logs docker-ps docker-clean db-setup db-migrate db-migrate-revert db-migrate-redo db-reset db-migration db-psql redis-cli gen-password gen-jwt backend-run frontend-run dev clean test test-unit test-integration test-db-setup
 
 # Default target - show help
 help:
@@ -29,6 +29,12 @@ help:
 	@echo "  make backend-run      - Run backend API server"
 	@echo "  make frontend-run     - Run frontend dev server"
 	@echo "  make dev              - Run backend and view logs"
+	@echo ""
+	@echo "🧪 Testing Commands:"
+	@echo "  make test             - Run all tests (unit + integration)"
+	@echo "  make test-unit        - Run unit tests only"
+	@echo "  make test-integration - Run integration tests only"
+	@echo "  make test-db-setup    - Create and migrate test database"
 	@echo ""
 	@echo "🧹 Cleanup:"
 	@echo "  make clean            - Clean build artifacts"
@@ -148,6 +154,34 @@ dev: docker-up
 	@echo "🚀 Starting development environment..."
 	@echo "Backend will run on http://localhost:8000"
 	@$(MAKE) backend-run
+
+# ==================== Testing Commands ====================
+
+# Test database URL - override with environment variable if needed
+TEST_DB_URL ?= postgres://livro_cia_user:$(shell grep POSTGRES_PASSWORD .env 2>/dev/null | cut -d= -f2)@localhost:5432/livroecia_test
+
+test-db-setup:
+	@echo "🗄️  Setting up test database..."
+	@echo "Creating database livroecia_test (if not exists)..."
+	-docker compose exec postgres createdb -U livro_cia_user livroecia_test 2>/dev/null || true
+	@echo "Running migrations on test database..."
+	cd backend && DATABASE_URL="$(TEST_DB_URL)" diesel migration run
+	@echo "✅ Test database ready"
+
+test-unit:
+	@echo "🧪 Running unit tests..."
+	cd backend && cargo test --lib
+	@echo "✅ Unit tests complete"
+
+test-integration: test-db-setup
+	@echo "🧪 Running integration tests (this may take a while)..."
+	cd backend && TEST_DATABASE_URL="$(TEST_DB_URL)" cargo test --test '*' -- --test-threads=1
+	@echo "✅ Integration tests complete"
+
+test: test-db-setup
+	@echo "🧪 Running all tests..."
+	cd backend && TEST_DATABASE_URL="$(TEST_DB_URL)" cargo test -- --test-threads=1
+	@echo "✅ All tests complete"
 
 # ==================== Cleanup Commands ====================
 

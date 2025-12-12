@@ -66,6 +66,7 @@ tokio-test = "0.4"
 tempfile = "3.19"
 pretty_assertions = "1.4"
 base64 = "0.22"
+serial_test = "3.2"
 
 [[bin]]
 name = "create_admin"
