@@ -47,8 +47,8 @@ pub async fn list_employees(
         None
     };
 
-    // Build quey with filters (same pattern as products.rs)
-    let build_filtered_quey = || {
+    // Build query with filters (same pattern as products.rs)
+    let build_filtered_query = || {
         let mut query_builder = users::table.inner_join(roles::table).into_boxed();
 
         if let Some(role_id) = role_filter {
@@ -68,10 +68,11 @@ pub async fn list_employees(
             );
         }
 
-        query_builder.order(users::created_at.desc())
+        query_builder
     };
 
-    let total_count = build_filtered_quey()
+    // Count without ordering (ORDER BY conflicts with COUNT in JOINs)
+    let total_count = build_filtered_query()
         .count()
         .get_result::<i64>(&mut db.0)
         .map_err(|e| {
@@ -79,8 +80,10 @@ pub async fn list_employees(
             ApiError::InternalError("Failed to retrieve employees".to_string())
         })?;
 
-    let results = build_filtered_quey()
+    // Load with ordering
+    let results = build_filtered_query()
         .select((User::as_select(), Role::as_select()))
+        .order(users::created_at.desc())
         .limit(pagination.per_page)
         .offset(pagination.offset)
         .load::<(User, Role)>(&mut db.0)
@@ -340,25 +343,26 @@ pub async fn update_employee(
         }
     }
 
-    // Build update struct
-    let update_data = UpdateUser {
-        name: req.name,
-        is_active: req.is_active,
-        email_verified: None,
-        email_verified_at: None,
-        password_reset_token: None,
-        password_reset_expires_at: None,
-        last_login_at: None,
-    };
+    // Update user fields only if there are changes
+    if req.name.is_some() || req.is_active.is_some() {
+        let update_data = UpdateUser {
+            name: req.name.clone(),
+            is_active: req.is_active,
+            email_verified: None,
+            email_verified_at: None,
+            password_reset_token: None,
+            password_reset_expires_at: None,
+            last_login_at: None,
+        };
 
-    // Update user fields
-    diesel::update(users::table.filter(users::id.eq(employee_id)))
-        .set(&update_data)
-        .execute(&mut db.0)
-        .map_err(|e| {
-            log::error!("Failed to update employee {}: {}", employee_id, e);
-            ApiError::InternalError("Failed to update employee".to_string())
-        })?;
+        diesel::update(users::table.filter(users::id.eq(employee_id)))
+            .set(&update_data)
+            .execute(&mut db.0)
+            .map_err(|e| {
+                log::error!("Failed to update employee {}: {}", employee_id, e);
+                ApiError::InternalError("Failed to update employee".to_string())
+            })?;
+    }
 
     // Update role separately (not in UpdateUser struct)
     if let Some(new_role_id) = req.role_id {

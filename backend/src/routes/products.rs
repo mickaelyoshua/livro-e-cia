@@ -71,7 +71,7 @@ pub async fn list_products(
         ));
     }
 
-    // Making a builder because i can not reuse the same query twice
+    // Build filtered query without sorting (for reuse in count and data retrieval)
     let build_filtered_query = || {
         // Dynamic query with boxed for conditional filters
         let mut query_builder = products::table
@@ -97,20 +97,10 @@ pub async fn list_products(
             );
         }
 
-        // Sort (already validated)
-        match sort_field {
-            "title" => query_builder.order(products::title.asc()),
-            "-title" => query_builder.order(products::title.desc()),
-            "author" => query_builder.order(products::author.asc()),
-            "-author" => query_builder.order(products::author.desc()),
-            "price" => query_builder.order(products::price.asc()),
-            "-price" => query_builder.order(products::price.desc()),
-            "created_at" => query_builder.order(products::created_at.asc()),
-            "-created_at" => query_builder.order(products::created_at.desc()),
-            _ => query_builder,
-        }
+        query_builder
     };
 
+    // Count without sorting (ORDER BY conflicts with COUNT in JOINs)
     let total_count = build_filtered_query()
         .count()
         .get_result::<i64>(&mut db.0)
@@ -119,8 +109,22 @@ pub async fn list_products(
             ApiError::InternalError("Failed to retrieve products".to_string())
         })?;
 
-    // Get paginated result
-    let results = build_filtered_query()
+    // Apply sorting for data retrieval
+    let mut data_query = build_filtered_query();
+    data_query = match sort_field {
+        "title" => data_query.order(products::title.asc()),
+        "-title" => data_query.order(products::title.desc()),
+        "author" => data_query.order(products::author.asc()),
+        "-author" => data_query.order(products::author.desc()),
+        "price" => data_query.order(products::price.asc()),
+        "-price" => data_query.order(products::price.desc()),
+        "created_at" => data_query.order(products::created_at.asc()),
+        "-created_at" => data_query.order(products::created_at.desc()),
+        _ => data_query,
+    };
+
+    // Get paginated result with sorting
+    let results = data_query
         .select((Product::as_select(), Category::as_select()))
         .limit(pagination.per_page)
         .offset(pagination.offset)
