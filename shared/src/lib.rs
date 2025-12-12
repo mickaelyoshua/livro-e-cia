@@ -100,7 +100,7 @@ pub struct ProductDto {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct CreateProductRequest {
     #[validate(length(min = 1, max = 255))]
     pub title: String,
@@ -122,7 +122,7 @@ pub struct CreateProductRequest {
     pub cover_image_url: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct UpdateProductRequest {
     #[validate(length(min = 1, max = 255))]
     pub title: Option<String>,
@@ -143,7 +143,7 @@ pub struct UpdateProductRequest {
     pub is_active: Option<bool>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PaginatedResponse<T> {
     pub data: Vec<T>,
     pub page: i64,
@@ -167,7 +167,7 @@ pub struct TokenResponse {
 
 // ========== Auth Request DTOs ==========
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct LoginRequest {
     #[validate(email, length(max = 255))]
     pub email: String,
@@ -189,7 +189,7 @@ pub struct RegisterRequest {
     pub role_id: Uuid,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AuthResponse {
     pub token_response: TokenResponse,
     pub user: UserDto,
@@ -210,7 +210,7 @@ pub struct ForgotPasswordRequest {
     pub email: String,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct ResetPasswordRequest {
     #[validate(length(min = 1))]
     pub token: String,
@@ -230,7 +230,7 @@ pub struct VerifyEmailRequest {
 
 // ========== Employee DTOs ==========
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct CreateEmployeeRequest {
     #[validate(email, length(max = 255))]
     pub email: String,
@@ -239,7 +239,7 @@ pub struct CreateEmployeeRequest {
     pub role_id: Uuid,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct UpdateEmployeeRequest {
     #[validate(length(min = 1, max = 255))]
     pub name: Option<String>,

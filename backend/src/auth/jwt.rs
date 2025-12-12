@@ -48,6 +48,7 @@ pub struct Claims {
     pub role: String,       // User role
     pub exp: i64,           // Expiration
     pub iat: i64,           // Issued at
+    pub jti: String,        // JWT ID (unique identifier)
     pub token_type: String, // "access" or "refresh"
 }
 
@@ -65,6 +66,7 @@ pub fn generate_access_token(user_id: Uuid, role: &str, secret: &str) -> Result<
         role: role.to_string(),
         exp: expiration,
         iat: now.timestamp(),
+        jti: Uuid::new_v4().to_string(),
         token_type: "access".to_string(),
     };
 
@@ -84,6 +86,7 @@ pub fn generate_refresh_token(user_id: Uuid, role: &str, secret: &str) -> Result
         role: role.to_string(),
         exp: expiration,
         iat: now.timestamp(),
+        jti: Uuid::new_v4().to_string(),
         token_type: "refresh".to_string(),
     };
 
