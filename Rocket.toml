@@ -1,0 +1,18 @@
+# Rocket Configuration - Non-sensitive defaults only
+# Secrets must be set via environment variables
+
+[default]
+address = "127.0.0.1"
+port = 8000
+workers = 4
+log_level = "normal"
+limits = { form = "64 kB", json = "1 MiB" }
+
+[debug]
+log_level = "debug"
+limits = { form = "256 kB", json = "10 MiB" }
+
+[release]
+address = "0.0.0.0"
+log_level = "critical"
+workers = 16
