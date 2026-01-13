@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use uuid::Uuid;
 
-#[derive(Debug, Queryable)]
+#[derive(Debug, Queryable, Associations)]
 #[diesel(belongs_to(crate::models::Role, foreign_key = role_id))]
 #[diesel(table_name = crate::schema::users)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
