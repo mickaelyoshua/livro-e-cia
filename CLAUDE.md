@@ -4,6 +4,13 @@
 
 Livro e Cia is a web application for internal management of a Christian bookstore. It handles **stock management**, **sales transactions**, and **statistical analysis of sales data**.
 
+## AI Assistant Guidelines
+
+- **Do NOT modify code** unless explicitly requested
+- **Explain and show** what changes are needed - the developer will implement them
+- Provide code snippets, file paths, and clear instructions
+- Ask clarifying questions before suggesting solutions
+
 ## Design Principles
 
 ### Simple but Complete
