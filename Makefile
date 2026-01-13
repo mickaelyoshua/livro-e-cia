@@ -1,12 +1,17 @@
-.PHONY: up down restart logs ps clean db-shell
+# ==================== Docker Commands ====================
+.PHONY: up down stop restart logs ps clean db-shell
 
 # Start all services in detached mode
 up:
 	docker compose up -d
 
-# Stop all services
+# Delete all services
 down:
 	docker compose down
+
+# Stop all services
+stop:
+	docker compose stop
 
 # Restart all services
 restart:
@@ -39,3 +44,14 @@ build:
 # Check service health
 health:
 	docker compose ps --format "table {{.Name}}\t{{.Status}}"
+
+# # ==================== Database Commands ====================
+# .PHONY: migrate db-reset
+#
+# # Run all migrations
+# migrate:
+# 	diesel migration run
+#
+# # Reset Database (Delete and rerun migrations)
+# db-reset:
+# 	diesel database reset
