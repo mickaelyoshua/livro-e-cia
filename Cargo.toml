@@ -8,6 +8,7 @@ edition = "2024"
 diesel = { version = "2.3", features = ["postgres", "r2d2", "chrono", "uuid"] }
 diesel_migrations = "2.3"
 uuid = { version = "1.19.0", features = ["v4", "serde"] }
+rust_decimal = { version = "1.39", features = ["db-diesel2-postgres"] }
 chrono = { version = "0.4.42", features = ["serde"]}
 
 # Environment Variables
