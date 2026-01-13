@@ -14,7 +14,6 @@ diesel::table! {
         #[max_length = 100]
         name -> Varchar,
         description -> Nullable<Text>,
-        created_at -> Timestamptz,
     }
 }
 
