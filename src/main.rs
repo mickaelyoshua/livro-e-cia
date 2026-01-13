@@ -4,6 +4,7 @@ use dotenvy::dotenv;
 
 mod db;
 mod models;
+mod schema;
 
 fn main() {
     dotenv().ok();
