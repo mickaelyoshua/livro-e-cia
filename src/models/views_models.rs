@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::models::PaymentMethod;
 
 #[derive(Serialize)]
-pub struct UserView {
+pub struct EmployeeView {
     pub id: Uuid,
     pub email: String,
     pub name: String,
