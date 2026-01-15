@@ -6,13 +6,19 @@ use diesel::{
     pg::{Pg, PgValue},
     serialize::{self, IsNull, ToSql},
 };
+use rocket::FromFormField;
+use serde::Serialize;
 
-#[derive(Debug, PartialEq, AsExpression, FromSqlRow)]
+#[derive(Debug, PartialEq, AsExpression, FromSqlRow, FromFormField, Serialize)]
 #[diesel(sql_type = crate::schema::sql_types::PaymentMethod)]
 pub enum PaymentMethod {
+    #[field(value = "cash")] // From "FromFormField" to be used on the CreateSaleForm struct
     Cash,
+    #[field(value = "credit_card")]
     CreditCard,
+    #[field(value = "debit_card")]
     DebitCard,
+    #[field(value = "pix")]
     Pix,
 }
 
