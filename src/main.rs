@@ -3,6 +3,7 @@ use std::env;
 use dotenvy::dotenv;
 
 mod db;
+mod error;
 mod models;
 mod schema;
 
