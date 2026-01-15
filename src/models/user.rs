@@ -16,3 +16,22 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
+
+#[derive(Debug, Insertable)]
+#[diesel(table_name = crate::schema::users)]
+pub struct NewUser {
+    pub email: String,
+    pub password_hash: String,
+    pub name: String,
+    pub role_id: Uuid,
+}
+
+#[derive(Debug, AsChangeset)]
+#[diesel(table_name = crate::schema::users)]
+pub struct UpdateUser {
+    pub email: Option<String>,
+    pub password_hash: Option<String>,
+    pub name: Option<String>,
+    pub role_id: Option<Uuid>,
+    pub is_active: Option<bool>,
+}

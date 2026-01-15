@@ -14,3 +14,13 @@ pub struct SaleItem {
     pub unit_price: rust_decimal::Decimal,
     pub subtotal: rust_decimal::Decimal,
 }
+
+#[derive(Debug, Insertable)]
+#[diesel(table_name = crate::schema::sale_items)]
+pub struct NewSaleItem {
+    pub sale_id: Uuid,
+    pub product_id: Uuid,
+    pub quantity: i32,
+    pub unit_price: rust_decimal::Decimal,
+    pub subtotal: rust_decimal::Decimal,
+}
