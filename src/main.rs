@@ -5,6 +5,7 @@ use dotenvy::dotenv;
 mod db;
 mod error;
 mod models;
+mod routes;
 mod schema;
 
 fn main() {
