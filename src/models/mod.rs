@@ -1,19 +1,19 @@
 pub mod category;
+pub mod employees;
 pub mod forms_models;
 pub mod payment_method;
 pub mod product;
 pub mod role;
 pub mod sale;
 pub mod sale_item;
-pub mod user;
 pub mod views_models;
 
 pub use category::*;
+pub use employees::*;
 pub use forms_models::*;
 pub use payment_method::*;
 pub use product::*;
 pub use role::*;
 pub use sale::*;
 pub use sale_item::*;
-pub use user::*;
 pub use views_models::*;

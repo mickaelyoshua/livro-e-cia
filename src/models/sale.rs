@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::models::PaymentMethod;
 
 #[derive(Debug, Queryable, Associations)]
-#[diesel(belongs_to(crate::models::User, foreign_key = seller_id))]
+#[diesel(belongs_to(crate::models::Employee, foreign_key = seller_id))]
 #[diesel(table_name = crate::schema::sales)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Sale {

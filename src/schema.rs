@@ -20,6 +20,24 @@ diesel::table! {
 diesel::table! {
     use diesel::sql_types::*;
 
+    employees (id) {
+        id -> Uuid,
+        #[max_length = 255]
+        email -> Varchar,
+        #[max_length = 255]
+        password_hash -> Varchar,
+        #[max_length = 255]
+        name -> Varchar,
+        role_id -> Uuid,
+        is_active -> Bool,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+
     products (id) {
         id -> Uuid,
         #[max_length = 255]
@@ -81,30 +99,12 @@ diesel::table! {
     }
 }
 
-diesel::table! {
-    use diesel::sql_types::*;
-
-    users (id) {
-        id -> Uuid,
-        #[max_length = 255]
-        email -> Varchar,
-        #[max_length = 255]
-        password_hash -> Varchar,
-        #[max_length = 255]
-        name -> Varchar,
-        role_id -> Uuid,
-        is_active -> Bool,
-        created_at -> Timestamptz,
-        updated_at -> Timestamptz,
-    }
-}
-
+diesel::joinable!(employees -> roles (role_id));
 diesel::joinable!(products -> categories (category_id));
 diesel::joinable!(sale_items -> products (product_id));
 diesel::joinable!(sale_items -> sales (sale_id));
-diesel::joinable!(sales -> users (seller_id));
-diesel::joinable!(users -> roles (role_id));
+diesel::joinable!(sales -> employees (seller_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    categories, products, roles, sale_items, sales, users,
+    categories, employees, products, roles, sale_items, sales,
 );

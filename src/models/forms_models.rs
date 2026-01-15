@@ -30,7 +30,7 @@ impl<'r> FromFormField<'r> for FormNaiveDate {
 }
 
 #[derive(Debug, FromForm)]
-pub struct CreateUserForm {
+pub struct CreateEmployeeForm {
     pub email: String,
     pub password: String,
     pub name: String,
@@ -38,7 +38,7 @@ pub struct CreateUserForm {
 }
 
 #[derive(Debug, FromForm)]
-pub struct UpdateUserForm {
+pub struct UpdateEmployeeForm {
     pub email: Option<String>,
     pub password: Option<String>,
     pub name: Option<String>,
