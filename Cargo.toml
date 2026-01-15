@@ -5,11 +5,23 @@ edition = "2024"
 
 [dependencies]
 # Database
-diesel = { version = "2.3", features = ["postgres", "r2d2", "chrono", "uuid"] }
+diesel = { version = "2.3", features = ["postgres", "r2d2", "chrono", "uuid", "numeric"] }
 diesel_migrations = "2.3"
-uuid = { version = "1.19.0", features = ["v4", "serde"] }
-rust_decimal = { version = "1.39", features = ["db-diesel2-postgres"] }
-chrono = { version = "0.4.42", features = ["serde"]}
+uuid = { version = "1.19", features = ["v4", "serde"] }
+rust_decimal = { version = "1.39", features = ["db-diesel2-postgres", "serde-with-str"] }
+chrono = { version = "0.4", features = ["serde"]}
 
 # Environment Variables
 dotenvy = "0.15"
+
+# Web framework
+rocket = { version = "0.5", features = ["uuid"] }
+rocket_dyn_templates = { version = "0.2", features = ["tera"] }
+serde = { version = "1.0", features = ["derive"] }
+
+# Error handling
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
