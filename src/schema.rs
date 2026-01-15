@@ -77,6 +77,7 @@ diesel::table! {
         payment_method -> PaymentMethod,
         notes -> Nullable<Text>,
         created_at -> Timestamptz,
+        updated_at -> Timestamptz,
     }
 }
 
