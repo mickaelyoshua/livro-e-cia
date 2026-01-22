@@ -34,7 +34,7 @@ pub struct CreateEmployeeForm {
     pub email: String,
     pub password: String,
     pub name: String,
-    pub role_id: Uuid,
+    pub role: String,
 }
 
 #[derive(Debug, FromForm)]
@@ -42,7 +42,7 @@ pub struct UpdateEmployeeForm {
     pub email: Option<String>,
     pub password: Option<String>,
     pub name: Option<String>,
-    pub role_id: Option<Uuid>,
+    pub role: Option<String>,
     pub is_active: Option<bool>,
 }
 

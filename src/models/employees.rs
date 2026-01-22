@@ -2,8 +2,7 @@ use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use uuid::Uuid;
 
-#[derive(Debug, Queryable, Associations)]
-#[diesel(belongs_to(crate::models::Role, foreign_key = role_id))]
+#[derive(Debug, Queryable, Identifiable, Selectable)]
 #[diesel(table_name = crate::schema::employees)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Employee {
@@ -11,7 +10,7 @@ pub struct Employee {
     pub email: String,
     pub password_hash: String,
     pub name: String,
-    pub role_id: Uuid,
+    pub role: String,
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -23,7 +22,7 @@ pub struct NewEmployee {
     pub email: String,
     pub password_hash: String,
     pub name: String,
-    pub role_id: Uuid,
+    pub role: String,
 }
 
 #[derive(Debug, AsChangeset)]
@@ -32,6 +31,6 @@ pub struct UpdateEmployee {
     pub email: Option<String>,
     pub password_hash: Option<String>,
     pub name: Option<String>,
-    pub role_id: Option<Uuid>,
+    pub role: Option<String>,
     pub is_active: Option<bool>,
 }

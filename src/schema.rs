@@ -28,7 +28,8 @@ diesel::table! {
         password_hash -> Varchar,
         #[max_length = 255]
         name -> Varchar,
-        role_id -> Uuid,
+        #[max_length = 50]
+        role -> Varchar,
         is_active -> Bool,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
@@ -62,8 +63,20 @@ diesel::table! {
 diesel::table! {
     use diesel::sql_types::*;
 
-    roles (id) {
+    refresh_token_families (id) {
         id -> Uuid,
+        employee_id -> Uuid,
+        current_jti -> Uuid,
+        is_revoked -> Bool,
+        created_at -> Timestamptz,
+        last_used_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+
+    roles (name) {
         #[max_length = 50]
         name -> Varchar,
         description -> Nullable<Text>,
@@ -99,12 +112,19 @@ diesel::table! {
     }
 }
 
-diesel::joinable!(employees -> roles (role_id));
+diesel::joinable!(employees -> roles (role));
 diesel::joinable!(products -> categories (category_id));
+diesel::joinable!(refresh_token_families -> employees (employee_id));
 diesel::joinable!(sale_items -> products (product_id));
 diesel::joinable!(sale_items -> sales (sale_id));
 diesel::joinable!(sales -> employees (seller_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    categories, employees, products, roles, sale_items, sales,
+    categories,
+    employees,
+    products,
+    refresh_token_families,
+    roles,
+    sale_items,
+    sales,
 );
