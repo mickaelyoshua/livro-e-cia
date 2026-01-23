@@ -17,6 +17,12 @@ pub enum AppError {
     Unauthorized,
     #[error("Access denied")]
     Forbidden,
+    #[error("Email or password are incorrect")]
+    InvalidCredentials,
+    #[error("Session expired")]
+    TokenExpired,
+    #[error("Security violation detected")]
+    TokenReuse,
 
     // Resource errors
     #[error("Resource not found")]
@@ -25,6 +31,10 @@ pub enum AppError {
     // Validation errors
     #[error("{0}")]
     Validation(String),
+
+    // Internal Error
+    #[error("Internal error")]
+    Internal(String),
 }
 
 impl AppError {
@@ -36,8 +46,11 @@ impl AppError {
     /// HTTP status code for errors.
     fn status(&self) -> Status {
         match self {
-            Self::Database(_) | Self::Pool(_) => Status::InternalServerError,
-            Self::Unauthorized => Status::Unauthorized,
+            Self::Database(_) | Self::Pool(_) | Self::Internal(_) => Status::InternalServerError,
+            Self::Unauthorized
+            | Self::InvalidCredentials
+            | Self::TokenExpired
+            | Self::TokenReuse => Status::Unauthorized,
             Self::Forbidden => Status::Forbidden,
             Self::NotFound => Status::NotFound,
             Self::Validation(_) => Status::BadRequest,
@@ -47,13 +60,16 @@ impl AppError {
     /// User-safe message. Never expose internal details.
     fn user_message(&self) -> &str {
         match self {
-            Self::Database(_) | Self::Pool(_) => {
+            Self::Database(_) | Self::Pool(_) | Self::Internal(_) => {
                 "An internal error occurred. Please try again later."
             }
             Self::Unauthorized => "Please log in to continue.",
             Self::Forbidden => "You don't have permission to access this resource.",
             Self::NotFound => "The requested resource was not found.",
             Self::Validation(msg) => msg,
+            Self::InvalidCredentials => "Email or password are incorrect.",
+            Self::TokenExpired => "Session expired. Please log in again.",
+            Self::TokenReuse => "Session invalidated. Please log in again.",
         }
     }
 }
@@ -84,5 +100,17 @@ impl<'r> Responder<'r, 'static> for AppError {
                 response.set_status(status);
                 response
             })
+    }
+}
+
+impl From<argon2::password_hash::Error> for AppError {
+    fn from(value: argon2::password_hash::Error) -> Self {
+        AppError::Internal(value.to_string())
+    }
+}
+
+impl From<argon2::Error> for AppError {
+    fn from(value: argon2::Error) -> Self {
+        AppError::Internal(value.to_string())
     }
 }
