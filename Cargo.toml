@@ -4,26 +4,38 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-# Database
-diesel = { version = "2.3", features = ["postgres", "r2d2", "chrono", "uuid", "numeric"] }
-diesel_migrations = "2.3"
-uuid = { version = "1.19", features = ["v4", "serde"] }
-rust_decimal = { version = "1.39", features = ["db-diesel2-postgres", "serde-with-str"] }
-chrono = { version = "0.4", features = ["serde"]}
-
-# Environment Variables
-dotenvy = "0.15"
-
 # Web framework
-rocket = { version = "0.5", features = ["uuid", "secrets"] }
-rocket_dyn_templates = { version = "0.2", features = ["tera"] }
+axum = { version = "0.8", features = ["macros"] }
+axum-extra = { version = "0.12", features = ["cookie-private"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.6", features = ["fs", "trace"] }
 serde = { version = "1.0", features = ["derive"] }
+
+# Templates
+askama = "0.15"
+askama_web = { version = "0.15", features = ["axum-0.8"] }
+
+# Database
+sqlx = { version = "0.8", features = [
+  "postgres",
+  "runtime-tokio",
+  "tls-rustls",
+  "uuid",
+  "chrono",
+  "rust_decimal",
+  "migrate",
+] }
+uuid = { version = "1.19", features = ["v4", "serde"] }
+rust_decimal = { version = "1.39", features = ["serde-with-str"] }
+chrono = { version = "0.4", features = ["serde"] }
 
 # Authentication
 jsonwebtoken = { version = "10.2", features = ["rust_crypto"] }
 argon2 = "0.5"
-rand = "0.9"
-time = "0.3"
+rand = "0.10"
+
+# Environment variables
+dotenvy = "0.15"
 
 # Error handling
 thiserror = "2.0"

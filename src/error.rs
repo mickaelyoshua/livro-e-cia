@@ -1,116 +1,103 @@
-use rocket::http::Status;
-use rocket::request::Request;
-use rocket::response::{self, Responder};
-use rocket_dyn_templates::{Template, context};
-use thiserror::Error;
+use askama::Template;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum AppError {
-    // Database errors
-    #[error("Database error: {0}")]
-    Database(#[from] diesel::result::Error),
-    #[error("Connection pool error: {0}")]
-    Pool(#[from] diesel::r2d2::Error),
+    // Infrastructure
+    #[error("database error: {0}")]
+    Database(#[from] sqlx::Error),
 
-    // Auth errors
-    #[error("Authentication required")]
+    #[error("internal error: {0}")]
+    Internal(String),
+
+    // Auth
+    #[error("unauthorized")]
     Unauthorized,
-    #[error("Access denied")]
+
+    #[error("forbidden")]
     Forbidden,
-    #[error("Email or password are incorrect")]
+
+    #[error("invalid credentials")]
     InvalidCredentials,
-    #[error("Session expired")]
+
+    #[error("token expired")]
     TokenExpired,
-    #[error("Security violation detected")]
+
+    #[error("token reuse detected")]
     TokenReuse,
 
-    // Resource errors
-    #[error("Resource not found")]
+    // Resource
+    #[error("not found")]
     NotFound,
 
-    // Validation errors
-    #[error("{0}")]
+    #[error("validation error: {0}")]
     Validation(String),
-
-    // Internal Error
-    #[error("Internal error")]
-    Internal(String),
 }
 
 impl AppError {
-    /// Create a validation error with a custom message.
-    pub fn validation(msg: impl Into<String>) -> Self {
-        Self::Validation(msg.into())
-    }
-
-    /// HTTP status code for errors.
-    fn status(&self) -> Status {
+    fn status_code(&self) -> StatusCode {
         match self {
-            Self::Database(_) | Self::Pool(_) | Self::Internal(_) => Status::InternalServerError,
-            Self::Unauthorized
-            | Self::InvalidCredentials
-            | Self::TokenExpired
-            | Self::TokenReuse => Status::Unauthorized,
-            Self::Forbidden => Status::Forbidden,
-            Self::NotFound => Status::NotFound,
-            Self::Validation(_) => Status::BadRequest,
+            Self::Database(_) | Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Unauthorized | Self::InvalidCredentials | Self::TokenExpired => {
+                StatusCode::UNAUTHORIZED
+            }
+            Self::Forbidden | Self::TokenReuse => StatusCode::FORBIDDEN,
+            Self::NotFound => StatusCode::NOT_FOUND,
+            Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
         }
     }
 
-    /// User-safe message. Never expose internal details.
     fn user_message(&self) -> &str {
         match self {
-            Self::Database(_) | Self::Pool(_) | Self::Internal(_) => {
-                "An internal error occurred. Please try again later."
+            Self::Database(_) | Self::Internal(_) => {
+                "Ocorreu um erro interno. Tente novamente mais tarde."
             }
-            Self::Unauthorized => "Please log in to continue.",
-            Self::Forbidden => "You don't have permission to access this resource.",
-            Self::NotFound => "The requested resource was not found.",
+            Self::Unauthorized => "Você precisa estar autenticado para acessar este recurso.",
+            Self::Forbidden | Self::TokenReuse => {
+                "Você não tem permissão para acessar este recurso."
+            }
+            Self::InvalidCredentials => "Email ou senha inválidos.",
+            Self::TokenExpired => "Sua sessão expirou. Faça login novamente.",
+            Self::NotFound => "Recurso não encontrado.",
             Self::Validation(msg) => msg,
-            Self::InvalidCredentials => "Email or password are incorrect.",
-            Self::TokenExpired => "Session expired. Please log in again.",
-            Self::TokenReuse => "Session invalidated. Please log in again.",
         }
     }
 }
 
-impl<'r> Responder<'r, 'static> for AppError {
-    fn respond_to(self, request: &'r Request<'_>) -> response::Result<'static> {
-        let status = self.status();
+#[derive(Template)]
+#[template(path = "error.html")]
+struct ErrorTemplate {
+    status: u16,
+    reason: String,
+    message: String,
+}
 
-        // Log full error details server-side
-        tracing::error!(
-            error = %self, // use Display trait
-            error_debug = ?self, // use Debug trait
-            status = status.code,
-            uri = %request.uri(),
-            "Request failed"
-        );
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        let status = self.status_code();
 
-        // Render user-safe error page
-        let ctx = context! {
-            status_code: status.code,
-            status_reason: status.reason().unwrap_or("Error"),
-            message: self.user_message(),
+        match &self {
+            Self::NotFound => tracing::debug!(error = %self, "not found"),
+            Self::Validation(_) => tracing::debug!(error = %self, "validation error"),
+            Self::Unauthorized | Self::InvalidCredentials | Self::TokenExpired => {
+                tracing::warn!(error = %self, "auth error")
+            }
+            _ => tracing::error!(error = %self, status = status.as_u16(), "request error"),
+        }
+
+        let template = ErrorTemplate {
+            status: status.as_u16(),
+            reason: status
+                .canonical_reason()
+                .unwrap_or("Error")
+                .to_string(),
+            message: self.user_message().to_string(),
         };
 
-        Template::render("error", ctx)
-            .respond_to(request)
-            .map(|mut response| {
-                response.set_status(status);
-                response
-            })
-    }
-}
-
-impl From<argon2::password_hash::Error> for AppError {
-    fn from(value: argon2::password_hash::Error) -> Self {
-        AppError::Internal(value.to_string())
-    }
-}
-
-impl From<argon2::Error> for AppError {
-    fn from(value: argon2::Error) -> Self {
-        AppError::Internal(value.to_string())
+        match template.render() {
+            Ok(html) => (status, axum::response::Html(html)).into_response(),
+            Err(_) => (status, self.user_message().to_string()).into_response(),
+        }
     }
 }
