@@ -1,57 +1,58 @@
-# ==================== Docker Commands ====================
-.PHONY: up down stop restart logs ps clean db-shell
-
-# Start all services in detached mode
+# ── Docker ──────────────────────────────────────────────
+.PHONY: up
 up:
 	docker compose up -d
 
-# Delete all services
+.PHONY: down
 down:
 	docker compose down
 
-# Stop all services
-stop:
-	docker compose stop
-
-# Restart all services
-restart:
-	docker compose restart
-
-# View logs (follow mode)
+.PHONY: logs
 logs:
 	docker compose logs -f
 
-# View logs for postgres only
-logs-db:
-	docker compose logs -f postgres
-
-# Show running containers
-ps:
-	docker compose ps
-
-# Stop and remove containers, networks, volumes
-clean:
-	docker compose down -v
-
-# Open psql shell
-db-shell:
-	docker compose exec postgres psql -U $${POSTGRES_USER} -d $${POSTGRES_DB}
-
-# Build and start (useful after Dockerfile changes)
-build:
-	docker compose up -d --build
-
-# Check service health
+.PHONY: health
 health:
-	docker compose ps --format "table {{.Name}}\t{{.Status}}"
+	docker inspect --format='{{.State.Health.Status}}' livro_cia_postgres
 
-# # ==================== Database Commands ====================
-# .PHONY: migrate db-reset
-#
-# # Run all migrations
-# migrate:
-# 	diesel migration run
-#
-# # Reset Database (Delete and rerun migrations)
-# db-reset:
-# 	diesel database reset
+.PHONY: db-shell
+db-shell:
+	docker exec -it livro_cia_postgres psql -U $${POSTGRES_USER:-livro_cia} -d $${POSTGRES_DB:-livro_cia_db}
+
+# ── Database (requires: cargo install sqlx-cli --no-default-features --features rustls,postgres) ──
+.PHONY: db-setup
+db-setup:
+	sqlx database setup
+
+.PHONY: db-migrate
+db-migrate:
+	sqlx migrate run
+
+.PHONY: db-status
+db-status:
+	sqlx migrate info
+
+.PHONY: db-reset
+db-reset:
+	sqlx database reset -y --force
+
+# ── Development ─────────────────────────────────────────
+.PHONY: build
+build:
+	cargo build
+
+.PHONY: run
+run:
+	cargo run
+
+.PHONY: dev
+dev:
+	cargo watch -x run
+
+.PHONY: clippy
+clippy:
+	cargo clippy -- -D warnings
+
+.PHONY: check
+check:
+	cargo check

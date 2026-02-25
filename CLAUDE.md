@@ -22,8 +22,8 @@ Livro e Cia is a web application for internal management of a Christian bookstor
 
 ### Security First
 - Validate all input at API boundaries
-- Use parameterized queries (Diesel handles this)
-- Hash passwords with Argon2 or bcrypt
+- Use parameterized queries (SQLx handles this)
+- Hash passwords with Argon2id (OWASP-recommended params)
 - Implement proper JWT validation and expiration
 - Apply principle of least privilege for role-based access
 - Sanitize all user-provided data before use
@@ -43,7 +43,7 @@ Livro e Cia is a web application for internal management of a Christian bookstor
 
 ## Architecture
 
-### Response Format: HTML (HTMX + Tera templates)
+### Response Format: HTML (HTMX + Askama templates)
 
 This is a **monolithic server-rendered application**. Routes return HTML, not JSON.
 
@@ -54,17 +54,31 @@ This is a **monolithic server-rendered application**. Routes return HTML, not JS
 - Proven, stable technology
 - Future-proof: JSON endpoints can be added later if needed
 
+**Why Askama:**
+- Compile-time template checking - catches errors at build time, not runtime
+- Type-safe - templates reference Rust structs directly
+- Fast - zero runtime overhead, templates compile to Rust code
+
 ### Response Guidelines
 
 Routes should return:
 - **Full HTML pages** for initial page loads
 - **HTML fragments** for HTMX requests (check `HX-Request` header)
-- Use `rocket_dyn_templates::Template` for rendering
+- Use Askama templates with `#[derive(Template, WebTemplate)]`
 
 ```rust
-#[get("/products")]
-fn products_page(hx: Option<HxRequest>) -> Template {
-    // Return full page or fragment based on HX-Request header
+use askama::Template;
+use askama_web::WebTemplate;
+
+#[derive(Template, WebTemplate)]
+#[template(path = "products/list.html")]
+struct ProductsPage {
+    products: Vec<ProductView>,
+}
+
+async fn products_page() -> ProductsPage {
+    // Template implements IntoResponse automatically via WebTemplate
+    ProductsPage { products }
 }
 ```
 
@@ -73,75 +87,108 @@ fn products_page(hx: Option<HxRequest>) -> Template {
 | Component | Technology | Version |
 |-----------|------------|---------|
 | Language | Rust | Edition 2024 |
-| Web Framework | Rocket | 0.5 |
-| Templates | Tera | via rocket_dyn_templates 0.2 |
-| Frontend | HTMX + Chart.js | - |
+| Web Framework | Axum | 0.8 |
+| Templates | Askama | 0.15 (compile-time) + askama_web 0.15 |
+| Frontend | HTMX | 2.0.4 (vendored) |
+| Charts | Chart.js | (future) |
 | Database | PostgreSQL | 16 (Alpine) |
-| ORM | Diesel | 2.3 |
-| Authentication | JWT | (planned) |
+| DB Toolkit | SQLx | 0.8 (async, compile-time checked queries) |
+| Auth | JWT (jsonwebtoken 10.2) + Argon2id (argon2 0.5) |
+| Cookies | axum-extra PrivateCookieJar (encrypted) |
+| Async Runtime | tokio | 1 |
 | Containers | Docker Compose | - |
 
 ### Dependencies (Cargo.toml)
 
-**Database & ORM:**
-- `diesel` 2.3 - PostgreSQL ORM with r2d2, chrono, uuid, numeric
-- `diesel_migrations` 2.3 - Migration runner
-- `uuid` 1.19 - UUID v4 generation
-- `rust_decimal` 1.39 - Monetary precision
-- `chrono` 0.4 - Date/time handling
-
 **Web Framework:**
-- `rocket` 0.5 - Web framework
-- `rocket_dyn_templates` 0.2 - Tera template rendering
-- `serde` 1.0 - Serialization
+- `axum` 0.8 - Async web framework (with `macros` for `#[debug_handler]`)
+- `axum-extra` 0.12 - Encrypted private cookies (`cookie-private`)
+- `tokio` 1 - Async runtime (`full` features)
+- `tower-http` 0.6 - HTTP middleware (`fs` for static files, `trace` for logging)
+- `serde` 1.0 - Serialization (`derive`)
+
+**Templates:**
+- `askama` 0.15 - Compile-time template engine
+- `askama_web` 0.15 - Axum integration (`axum-0.8` feature)
+
+**Database:**
+- `sqlx` 0.8 - Async PostgreSQL toolkit (`postgres`, `runtime-tokio`, `tls-rustls`, `uuid`, `chrono`, `rust_decimal`, `migrate`)
+- `uuid` 1.19 - UUID v4 generation (`v4`, `serde`)
+- `rust_decimal` 1.39 - Monetary precision (`serde-with-str`)
+- `chrono` 0.4 - Date/time handling (`serde`)
+
+**Authentication:**
+- `jsonwebtoken` 10.2 - JWT tokens (`rust_crypto`)
+- `argon2` 0.5 - Password hashing (Argon2id)
+- `rand` 0.10 - Cryptographic random generation
 
 **Utilities:**
 - `dotenvy` 0.15 - Environment variables
 - `thiserror` 2.0 - Error handling
-- `tracing` 0.1 / `tracing-subscriber` 0.3 - Structured logging
+- `tracing` 0.1 / `tracing-subscriber` 0.3 - Structured logging (`env-filter`)
 
 ## Project Structure
 
 ```
 livro-e-cia/
 ├── src/
-│   ├── main.rs                   # Entry point (placeholder - needs Rocket integration)
-│   ├── db.rs                     # Database connection pooling (r2d2, max 10 connections)
-│   ├── error.rs                  # AppError enum with Responder impl
-│   ├── schema.rs                 # Diesel auto-generated (DO NOT EDIT)
+│   ├── main.rs                   # Axum bootstrap (PgPool, migrations, Router, TcpListener)
+│   ├── config.rs                 # AppConfig (from env vars)
+│   ├── error.rs                  # AppError enum with IntoResponse impl
+│   ├── auth/
+│   │   ├── mod.rs                # Module exports
+│   │   ├── claims.rs             # AccessClaims (15min) + RefreshClaims (7d) with rotation
+│   │   ├── cookie.rs             # PrivateCookieJar management (set/get/remove)
+│   │   ├── extractors.rs         # Axum extractors (AuthenticatedEmployee, AdminOnly, ManagerOrAbove)
+│   │   ├── password.rs           # Argon2id hash/verify (OWASP params)
+│   │   └── tokens.rs             # JwtConfig: generate, validate, rotate access/refresh tokens
 │   ├── models/
 │   │   ├── mod.rs                # Module exports
-│   │   ├── role.rs               # Role model
-│   │   ├── employees.rs          # Employee + NewEmployee + UpdateEmployee
+│   │   ├── role.rs               # Role (PK: name VARCHAR)
+│   │   ├── employee.rs           # Employee + NewEmployee + UpdateEmployee
 │   │   ├── category.rs           # Category + NewCategory + UpdateCategory
 │   │   ├── product.rs            # Product + NewProduct + UpdateProduct
-│   │   ├── sale.rs               # Sale + NewSale + UpdateSale
+│   │   ├── sale.rs               # Sale + NewSale
 │   │   ├── sale_item.rs          # SaleItem + NewSaleItem (composite PK)
-│   │   ├── payment_method.rs     # PaymentMethod enum with custom Diesel impl
-│   │   ├── forms_models.rs       # Form request structs + FormDecimal/FormNaiveDate helpers
-│   │   └── views_models.rs       # Response DTOs (EmployeeView, SaleView)
+│   │   └── payment_method.rs     # PaymentMethod enum with sqlx::Type
+│   ├── repositories/
+│   │   ├── mod.rs                # Module exports
+│   │   ├── employee_repo.rs      # Employee CRUD
+│   │   ├── product_repo.rs       # Product CRUD
+│   │   ├── category_repo.rs      # Category CRUD
+│   │   ├── sale_repo.rs          # Sale + SaleItem operations
+│   │   └── refresh_token_repo.rs # Token family tracking
 │   └── routes/
-│       ├── mod.rs                # Module exports
-│       └── employees.rs          # Employee routes (EMPTY - not implemented)
-├── migrations/                   # 9 Diesel migrations (all applied)
-│   ├── 2026-01-12-*_create_roles/
-│   ├── 2026-01-12-*_create_employees/
-│   ├── 2026-01-12-*_create_categories/
-│   ├── 2026-01-12-*_create_products/
-│   ├── 2026-01-12-*_create_payment_method_enum/
-│   ├── 2026-01-12-*_create_sales/
-│   ├── 2026-01-12-*_create_sale_items/
-│   └── 2026-01-12-*_create_stock_trigger/
-├── templates/
-│   └── base.html                 # Base template (EMPTY - not implemented)
-├── static/js/
-│   └── htmx.min.js               # HTMX library
+│       ├── mod.rs                # Module exports + Router assembly
+│       ├── auth.rs               # Login, logout, refresh
+│       ├── employees.rs          # Employee management
+│       ├── products.rs           # Product CRUD
+│       ├── categories.rs         # Category CRUD
+│       ├── sales.rs              # Sale operations
+│       ├── stats.rs              # Statistics/reports
+│       └── stock.rs              # Stock management
+├── migrations/                   # SQLx migrations (flat .sql files)
+│   ├── 20260112114105_create_roles.sql
+│   ├── 20260112114424_create_employees.sql
+│   ├── 20260112115846_create_categories.sql
+│   ├── 20260112120045_create_products.sql
+│   ├── 20260112125137_create_payment_method_enum.sql
+│   ├── 20260112125347_create_sales.sql
+│   ├── 20260112125600_create_sale_items.sql
+│   ├── 20260112125655_create_stock_trigger.sql
+│   ├── 20260115151000_create_refresh_token_families.sql
+│   └── 20260219000000_add_partial_indexes.sql
+├── templates/                    # Askama templates (compiled at build time)
+│   ├── base.html                 # Base layout (includes HTMX script)
+│   └── error.html                # Error page
+├── static/
+│   └── js/
+│       └── htmx.min.js           # HTMX 2.0.4 (vendored)
 ├── Cargo.toml
-├── Rocket.toml                   # Server config (port 8000, 4 workers dev, 16 release)
-├── diesel.toml
 ├── docker-compose.yml            # PostgreSQL 16 container
 ├── Makefile                      # Development commands
-└── .env                          # Environment variables
+├── .env-example                  # Environment template
+└── .env                          # Environment variables (in .gitignore)
 ```
 
 ## Database Schema
@@ -149,37 +196,60 @@ livro-e-cia/
 ### Entity Relationship
 
 ```
-roles (3 seed records: admin, manager, employee)
+roles (PK: name, 3 seed records: admin, manager, employee)
   │
-  └──< employees
+  └──< employees (FK: role -> roles.name)
          │
-         └──< sales ──< sale_items >── products >── categories (8 seed records)
+         ├──< sales ──< sale_items >── products >── categories (8 seed records)
+         │
+         └──< refresh_token_families (token rotation tracking)
 ```
 
 ### Tables
 
 | Table | Purpose | Key Fields |
 |-------|---------|------------|
-| `roles` | User roles | id, name, description |
-| `employees` | User accounts | id, email (unique), password_hash, name, role_id, is_active |
-| `categories` | Book categories | id, name (unique), description |
-| `products` | Book inventory | id, title, author, price, stock_quantity, category_id, is_active |
-| `sales` | Transactions | id, seller_id, subtotal, discount, total, payment_method, notes |
-| `sale_items` | Line items | (sale_id, product_id) PK, quantity, unit_price, subtotal |
+| `roles` | User roles | **name** (PK, VARCHAR), description |
+| `employees` | User accounts | id (UUID), email (unique), password_hash, name, **role** (VARCHAR FK -> roles.name), is_active |
+| `categories` | Book categories | id (UUID), name (unique), description, created_at, updated_at |
+| `products` | Book inventory | id (UUID), title, author, price, stock_quantity, publisher, publication_date, category_id, description, cover_image_url, is_active |
+| `sales` | Transactions | id (UUID), seller_id, subtotal, discount, total, payment_method (ENUM), notes |
+| `sale_items` | Line items | (sale_id, product_id) composite PK, quantity, unit_price, subtotal |
+| `refresh_token_families` | JWT refresh rotation | id (UUID), employee_id, current_jti, is_revoked, created_at, last_used_at |
 
 ### Payment Methods (PostgreSQL ENUM)
 - `cash`, `credit_card`, `debit_card`, `pix`
+
+### CHECK Constraints
+
+| Table | Constraint | Rule |
+|-------|-----------|------|
+| `sales` | `check_total_consistency` | `total = subtotal - discount` |
+| `sale_items` | `check_subtotal_consistency` | `subtotal = quantity * unit_price` |
+| `employees` | `check_name_not_empty` | `LENGTH(TRIM(name)) > 0` |
+| `products` | (inline) | `price >= 0`, `stock_quantity >= 0` |
+| `sales` | (inline) | `subtotal >= 0`, `discount >= 0`, `total >= 0` |
+| `sale_items` | (inline) | `quantity > 0`, `unit_price >= 0`, `subtotal >= 0` |
 
 ### Database Triggers
 
 | Trigger | Table | Purpose |
 |---------|-------|---------|
 | `update_employees_updated_at` | employees | Auto-update `updated_at` on UPDATE |
+| `update_categories_updated_at` | categories | Auto-update `updated_at` on UPDATE |
 | `update_products_updated_at` | products | Auto-update `updated_at` on UPDATE |
 | `update_sales_updated_at` | sales | Auto-update `updated_at` on UPDATE |
 | `trg_decrease_stock` | sale_items | Auto-decrement product stock on INSERT |
 
 **Important:** Stock is managed by database triggers - do NOT manually update stock when processing sales.
+
+### Partial Indexes
+
+| Index | Table | Filter | Purpose |
+|-------|-------|--------|---------|
+| `idx_employees_active` | employees | `WHERE is_active = TRUE` | Fast lookup of active employees |
+| `idx_products_active` | products | `WHERE is_active = TRUE` | Fast lookup of active products |
+| `idx_refresh_token_active` | refresh_token_families | `WHERE is_revoked = FALSE` | Fast lookup of valid token families |
 
 ### Seed Data
 
@@ -189,58 +259,107 @@ roles (3 seed records: admin, manager, employee)
 - `employee` - Store employee - sales and basic inventory
 
 **Categories (Portuguese):**
-- Bíblias, Estudos Bíblicos, Devocionais, Vida Cristã
-- Família e Relacionamentos, Infantil, Teologia, Biografias
+- Biblias, Estudos Biblicos, Devocionais, Vida Crista
+- Familia e Relacionamentos, Infantil, Teologia, Biografias
 
 ## Data Models
 
 ### Core Models (src/models/)
 
-All models derive `Queryable`, `Identifiable`, `Serialize`. Insertable structs use `Insertable` derive. Update structs use `AsChangeset` derive.
+All models derive `sqlx::FromRow` and `serde::Serialize` for database mapping and template rendering.
 
 ```rust
 // Pattern for each entity:
-pub struct Entity { ... }           // Queryable - read from DB
-pub struct NewEntity { ... }        // Insertable - create new
-pub struct UpdateEntity { ... }     // AsChangeset - partial updates with Option<T>
+#[derive(sqlx::FromRow, Serialize)]
+pub struct Entity { ... }           // FromRow - read from DB
+
+pub struct NewEntity { ... }        // Used in INSERT queries
+
+pub struct UpdateEntity { ... }     // Used in UPDATE queries (Option<T> fields for partial updates)
 ```
 
-### Form Helpers (forms_models.rs)
+**Note:** `employees.role` is a `String` (VARCHAR FK to `roles.name`), NOT a UUID.
 
-Custom wrapper types for form field parsing:
+### PaymentMethod Enum
 
 ```rust
-pub struct FormDecimal(pub rust_decimal::Decimal);  // Parses string to Decimal
-pub struct FormNaiveDate(pub NaiveDate);            // Parses YYYY-MM-DD to NaiveDate
+#[derive(sqlx::Type, Serialize, Deserialize)]
+#[sqlx(type_name = "payment_method", rename_all = "snake_case")]
+pub enum PaymentMethod {
+    Cash,
+    CreditCard,
+    DebitCard,
+    Pix,
+}
 ```
 
-### View Models (views_models.rs)
+SQLx maps this directly to the PostgreSQL `payment_method` ENUM via the `sqlx::Type` derive.
 
-DTOs for template rendering with joined data:
+## Authentication System
+
+### Architecture
+
+Uses **access + refresh token rotation** with **encrypted private cookies** (`axum-extra` `PrivateCookieJar`).
+
+| Token | TTL | Storage | Purpose |
+|-------|-----|---------|---------|
+| Access token | 15 minutes | Private cookie (path `/`) | API authentication |
+| Refresh token | 7 days | Private cookie (path `/auth`) | Token rotation |
+
+### Refresh Token Families
+
+Implements **token family tracking** for replay attack detection:
+- Each refresh creates a new `jti` within the same `family_id`
+- Reuse of an old `jti` revokes the entire family (`TokenReuse` error)
+- Tracked in `refresh_token_families` table
+
+### Axum Extractors (src/auth/extractors.rs)
+
+Authentication uses Axum's `FromRequestParts` trait to create extractors:
 
 ```rust
-pub struct EmployeeView { id, email, name, role_name, created_at, updated_at }
-pub struct SaleView { id, seller_name, subtotal, discount, total, payment_method, notes, created_at, updated_at, item_count }
+// Usage in route handlers:
+async fn list_employees(auth: AuthenticatedEmployee) -> impl IntoResponse { ... }
+async fn create_employee(auth: AdminOnly, ...) -> impl IntoResponse { ... }
+async fn update_product(auth: ManagerOrAbove, ...) -> impl IntoResponse { ... }
 ```
+
+| Extractor | Purpose |
+|-----------|---------|
+| `AuthenticatedEmployee` | Validates access token cookie, returns claims |
+| `AdminOnly` | Requires `admin` role |
+| `ManagerOrAbove` | Requires `admin` or `manager` role |
+
+### Password Hashing (src/auth/password.rs)
+
+- Algorithm: Argon2id
+- OWASP-recommended parameters: 19MiB memory, 2 iterations, 1 parallelism thread
+- Functions: `hash_password()`, `verify_password()`
 
 ## Error Handling
 
-`AppError` enum in `src/error.rs` implements `Responder`:
+`AppError` enum in `src/error.rs` implements `axum::response::IntoResponse`:
 
 ```rust
 pub enum AppError {
-    Database(diesel::result::Error),
-    Pool(diesel::r2d2::Error),
+    // Infrastructure
+    Database(sqlx::Error),
+    Internal(String),
+    // Auth
     Unauthorized,
     Forbidden,
+    InvalidCredentials,
+    TokenExpired,
+    TokenReuse,
+    // Resource
     NotFound,
     Validation(String),
 }
 ```
 
-- Maps to appropriate HTTP status codes
-- Renders `error.html` template
-- Logs full errors server-side
+- Maps to appropriate HTTP status codes via `IntoResponse`
+- Renders `error.html` Askama template
+- Logs full errors server-side via `tracing::error!`
 - Returns safe user messages (never exposes DB internals)
 
 ## Development Commands
@@ -253,10 +372,10 @@ make logs            # View container logs
 make db-shell        # Connect to PostgreSQL shell
 make health          # Check container health
 
-# Database
-diesel migration run           # Run pending migrations
-diesel migration revert        # Revert last migration
-diesel migration generate NAME # Create new migration
+# Database (requires sqlx-cli: cargo install sqlx-cli --features postgres)
+make db-migrate      # Run pending migrations
+make db-revert       # Revert last migration
+make db-reset        # Drop and recreate database, run all migrations
 
 # Build
 cargo build          # Build the project
@@ -271,42 +390,43 @@ Required in `.env`:
 
 ```bash
 DATABASE_URL=postgresql://user:pass@localhost:5432/livro_cia_db
-JWT_SECRET=<256-bit-hex-secret>
-ROCKET_PORT=8000
-ROCKET_ADDRESS=127.0.0.1
+JWT_SECRET=<minimum-32-bytes-hex-secret>
+HOST=127.0.0.1
+PORT=8000
+COOKIE_SECRET_KEY=<64-byte-hex-for-encrypted-cookies>
 RUST_LOG=info
+APP_ENV=development
 ```
 
 ## Implementation Status
 
 ### Completed
-- [x] Database schema (6 tables + payment_method ENUM)
-- [x] All migrations (9 total, including triggers)
+- [x] Cargo.toml with new dependency stack (Axum, SQLx, Askama)
+- [x] Database schema (7 tables + payment_method ENUM)
+- [x] All migrations (10 total, SQLx format)
 - [x] Database relationships and constraints
+- [x] CHECK constraints on derived values (sales.total, sale_items.subtotal)
 - [x] Stock management trigger (automatic on sale_items INSERT)
-- [x] Timestamp triggers (auto-updated_at)
-- [x] All data models (Role, Employee, Category, Product, Sale, SaleItem)
-- [x] Payment method with custom Diesel ENUM serialization
-- [x] Form request models with custom field types
-- [x] View/response models (EmployeeView, SaleView)
-- [x] Error handling (AppError with HTTP responses)
-- [x] Database connection pooling (r2d2)
-- [x] Environment configuration
+- [x] Timestamp triggers (auto-updated_at on employees, categories, products, sales)
+- [x] Partial indexes (active employees, active products, valid token families)
 - [x] Docker Compose PostgreSQL setup
-- [x] Rocket configuration (Rocket.toml)
-- [x] Logging infrastructure (tracing)
-- [x] HTMX static asset
 
 ### Not Implemented (TODO)
-- [ ] **Rocket integration in main.rs** - framework not launched
-- [ ] **Route handlers** - employees.rs is empty
-- [ ] **HTML templates** - base.html is empty
-- [ ] **Authentication/JWT** - models exist but logic not implemented
-- [ ] **Password hashing** - Argon2/bcrypt not integrated
-- [ ] **All endpoint implementations**
-- [ ] **Database query functions** - no repository layer
+- [ ] **src/main.rs** - Axum bootstrap (PgPool, migrations, Router, static files)
+- [ ] **HTMX library** - Download vendored htmx.min.js
+- [ ] **All data models** - Role, Employee, Category, Product, Sale, SaleItem, PaymentMethod
+- [ ] **AppError** with IntoResponse
+- [ ] **AppConfig** from env vars
+- [ ] **Auth extractors** - AuthenticatedEmployee, AdminOnly, ManagerOrAbove
+- [ ] **JWT token** generation, validation, rotation
+- [ ] **Password hashing** (Argon2id)
+- [ ] **Cookie management** (PrivateCookieJar)
+- [ ] **All repositories** - employee, product, category, sale, refresh_token
+- [ ] **All route handlers** - auth, employees, products, categories, sales, stats, stock
+- [ ] **HTML templates** - base.html, error.html, and all page templates
+- [ ] **Makefile** - Development commands
+- [ ] **.env-example** - Updated environment template
 - [ ] **Input validation** at API boundaries
-- [ ] **Authorization/RBAC logic**
 - [ ] **Tests**
 
 ## API Design Guidelines
@@ -316,6 +436,7 @@ RUST_LOG=info
 **Authentication**
 - `POST /auth/login` - User login
 - `POST /auth/logout` - User logout
+- `POST /auth/refresh` - Token rotation
 
 **Employees**
 - `GET /employees` - List employees
@@ -362,17 +483,22 @@ RUST_LOG=info
 - Use `snake_case` for functions and variables
 - Use `PascalCase` for structs and enums
 - Handle errors with `Result<T, E>` - no unwrap in business logic
-- Use Diesel for all database operations
+- Use SQLx for all database operations (raw SQL via `sqlx::query` / `sqlx::query_as`)
 - Validate input at API boundaries
-- Use request guards for authentication/authorization
+- Use Axum extractors for authentication/authorization
 - All monetary values use `rust_decimal::Decimal`
 - All IDs use `uuid::Uuid`
 - All timestamps use `chrono::DateTime<Utc>`
+- Database pool: pass `PgPool` via Axum `State`
+- Templates: derive both `askama::Template` and `askama_web::WebTemplate`
+- HTMX: vendored at `static/js/htmx.min.js`, served via `tower_http::services::ServeDir`
 
 ## Notes
 
 - Stock is automatically managed via database triggers - do NOT manually update stock when processing sales
-- All monetary values use `DECIMAL(10,2)` for precision
-- UUIDs are used for all primary keys
-- The `schema.rs` file is auto-generated by Diesel - DO NOT edit manually
-- Run `diesel print-schema` to regenerate after migration changes
+- All monetary values use `DECIMAL(10,2)` for precision - stored as-is, NOT as multiplied integers
+- UUIDs are used for all primary keys (except `roles` which uses `name` VARCHAR as PK)
+- `employees.role` is a VARCHAR FK to `roles.name`, NOT a UUID foreign key
+- SQLx migrations are flat `.sql` files in `migrations/` - no up/down separation
+- Askama templates are compiled at build time - template errors are caught during `cargo build`
+- HTMX is vendored locally (no CDN dependency at runtime)
