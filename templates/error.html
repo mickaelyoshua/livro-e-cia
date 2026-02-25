@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}{{ status }} - {{ reason }}{% endblock %}
+
+{% block content %}
+<main>
+    <h1>{{ status }} — {{ reason }}</h1>
+    <p>{{ message }}</p>
+    <a href="/">Voltar ao início</a>
+</main>
+{% endblock %}
