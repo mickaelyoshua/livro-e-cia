@@ -9,7 +9,7 @@ pub enum AppEnv {
 impl AppEnv {
     fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
-            "production" => Self::Production,
+            "production" | "prod" => Self::Production,
             _ => Self::Development,
         }
     }
